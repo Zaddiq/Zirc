@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zirc: IRC client with JavaScript scripting</title>
+<meta name="description" content="Zirc is a terminal IRC client you script in JavaScript. TLS, SASL, IRCv3, mIRC colors, and no dependencies.">
+<meta property="og:title" content="Zirc">
+<meta property="og:description" content="A terminal IRC client you script in JavaScript.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%231a1f7a'/%3E%3Cpath d='M8 9h16v3.2L13.4 20H24v3H8v-3.2L18.6 12H8z' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..900&family=IBM+Plex+Mono:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #e3e7ec;
+  --paper-deep: #d3d9e1;
+  --ink: #0f1b3d;
+  --ink-soft: #46506c;
+  --navy: #1a1f7a;
+  --teal: #006d6d;
+  --flame: #c2410c;
+  --screen: #12141a;
+  --screen-line: #2a2e3a;
+  --screen-text: #d8dbe3;
+  --screen-dim: #7d8497;
+  --sans: "Archivo", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --gutter: clamp(16px, 4vw, 48px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1226;
+    --paper-deep: #171c36;
+    --ink: #e6e9f5;
+    --ink-soft: #a2aac6;
+    --navy: #8f97ff;
+    --teal: #4fd1c5;
+    --flame: #ff9a62;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 1.0625rem/1.6 var(--sans);
+  font-stretch: 100%;
+}
+a { color: var(--teal); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 3px solid var(--flame); outline-offset: 3px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 var(--gutter); }
+
+/* ---- masthead */
+.mast { display: flex; justify-content: space-between; align-items: baseline; padding-top: 28px; }
+.logo { font: 800 1.5rem/1 var(--sans); font-stretch: 125%; letter-spacing: -0.02em; color: var(--ink); text-decoration: none; }
+.mast nav { display: flex; gap: 22px; font-size: 0.95rem; }
+.mast nav a { color: var(--ink-soft); text-decoration: none; }
+.mast nav a:hover { color: var(--ink); text-decoration: underline; }
+
+/* ---- hero */
+.hero { padding-top: clamp(40px, 7vw, 88px); padding-bottom: clamp(32px, 5vw, 56px); }
+h1 {
+  margin: 0;
+  font: 900 clamp(2.5rem, 7.2vw, 5.6rem)/0.98 var(--sans);
+  font-stretch: 125%;
+  letter-spacing: -0.035em;
+  max-width: 14ch;
+}
+.lede { margin: 28px 0 0; max-width: 54ch; font-size: clamp(1.1rem, 1.6vw, 1.3rem); color: var(--ink-soft); }
+.actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 32px; align-items: center; }
+.btn {
+  display: inline-block; padding: 13px 22px; font: 600 1rem/1 var(--sans);
+  background: var(--navy); color: #fff; text-decoration: none; border: 2px solid var(--navy);
+}
+.btn:hover { background: var(--ink); border-color: var(--ink); }
+.btn.alt { background: transparent; color: var(--ink); border-color: var(--ink); }
+.btn.alt:hover { background: var(--ink); color: var(--paper); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .btn { color: #0e1226; }
+  :root:not([data-theme="light"]) .btn:hover { background: var(--ink); }
+  :root:not([data-theme="light"]) .btn.alt { color: var(--ink); }
+  :root:not([data-theme="light"]) .btn.alt:hover { color: var(--paper); }
+}
+
+/* ---- terminal (the one memorable thing) */
+.term-frame { margin-top: clamp(32px, 5vw, 56px); }
+.term {
+  background: var(--screen); color: var(--screen-text);
+  font: 400 clamp(11.5px, 1.45vw, 14.5px)/1.45 var(--mono);
+  box-shadow: 10px 10px 0 var(--navy);
+  border: 2px solid var(--ink);
+  display: grid; grid-template-columns: minmax(0, 1fr) 17ch; grid-template-rows: auto minmax(0, 1fr) auto auto;
+  height: clamp(330px, 46vw, 440px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .term { border-color: var(--screen-line); box-shadow: 10px 10px 0 #2b3190; }
+}
+.term > * { min-width: 0; }
+.t-top, .t-bar { grid-column: 1 / -1; background: #d8dbe3; color: #12141a; padding: 0 1ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-log { min-height: 0; padding: 8px 1ch 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; border-right: 1px solid var(--screen-line); }
+.t-log div { padding-left: 8.5ch; text-indent: -8.5ch; overflow-wrap: anywhere; }
+.t-nicks { padding: 8px 1ch 0; overflow: hidden; white-space: nowrap; }
+.t-nicks .n { color: var(--screen-dim); }
+.t-in { grid-column: 1 / -1; padding: 0 1ch; white-space: pre; overflow: hidden; border-top: 1px solid var(--screen-line); }
+.t-in .pr { color: var(--screen-dim); }
+.caret { display: inline-block; width: 1ch; background: var(--screen-text); height: 1.1em; vertical-align: text-bottom; animation: blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.ts { color: var(--screen-dim); }
+.c-cy { color: #4cc9d6; } .c-or { color: #f4a259; } .c-gr { color: #5fd38d; } .c-rd { color: #ff6b6b; } .c-pu { color: #c792ea; } .c-dim { color: var(--screen-dim); } .c-yl { color: #f2d45c; }
+.b { font-weight: 600; }
+.replay {
+  margin-top: 22px; background: none; border: 0; padding: 0; font: inherit; font-size: 0.95rem;
+  color: var(--teal); cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+}
+.replay:hover { text-decoration-thickness: 2px; }
+
+/* ---- sections */
+section { padding-top: clamp(48px, 7vw, 96px); padding-bottom: clamp(48px, 7vw, 96px); border-top: 2px solid var(--ink); }
+h2 { margin: 0 0 12px; font: 800 clamp(1.8rem, 3.6vw, 2.7rem)/1.05 var(--sans); font-stretch: 112%; letter-spacing: -0.025em; max-width: 20ch; }
+.sub { margin: 0 0 40px; color: var(--ink-soft); max-width: 58ch; }
+
+.spec { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-left: 2px solid var(--ink); }
+.spec > div { padding: 4px 28px 8px; border-right: 2px solid var(--ink); }
+.spec > div:first-child { border-left: 0; }
+.spec h3 { margin: 0 0 14px; font: 700 1.2rem/1.2 var(--sans); font-stretch: 112%; }
+.spec ul { margin: 0; padding: 0; list-style: none; }
+.spec li { padding: 8px 0; border-top: 1px solid var(--paper-deep); font-size: 1rem; line-height: 1.45; }
+.spec li:first-child { border-top: 0; }
+
+.split { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: clamp(28px, 5vw, 64px); align-items: start; }
+pre.code {
+  margin: 0; padding: 22px 24px; background: var(--screen); color: var(--screen-text);
+  font: 400 clamp(12px, 1.3vw, 14px)/1.6 var(--mono); overflow-x: auto; border: 2px solid var(--ink);
+  tab-size: 2;
+}
+.tk-k { color: #c792ea; } .tk-s { color: #a8e08a; } .tk-c { color: #7d8497; font-style: italic; } .tk-f { color: #82aaff; } .tk-n { color: #f4a259; }
+.notes p { margin: 0 0 18px; }
+.notes p:last-child { margin: 0; }
+code { font: 400 0.92em var(--mono); background: var(--paper-deep); padding: 1px 6px; }
+.api { margin-top: 28px; width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.api th, .api td { text-align: left; padding: 9px 12px 9px 0; border-top: 1px solid var(--paper-deep); vertical-align: top; }
+.api th { font: 400 0.9rem var(--mono); white-space: nowrap; color: var(--navy); }
+
+.steps { display: grid; gap: 14px; max-width: 720px; }
+.cmd {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  background: var(--screen); color: var(--screen-text); border: 2px solid var(--ink);
+  padding: 14px 16px 14px 20px; font: 400 clamp(12px, 1.5vw, 15px)/1.4 var(--mono); overflow: hidden;
+}
+.cmd code { background: none; padding: 0; font: inherit; white-space: pre; overflow-x: auto; }
+.cmd .dollar { color: var(--screen-dim); margin-right: 1ch; user-select: none; }
+.copy {
+  flex: none; font: 600 0.85rem var(--sans); padding: 7px 12px; cursor: pointer;
+  background: transparent; color: var(--screen-text); border: 1px solid var(--screen-dim);
+}
+.copy:hover { background: var(--screen-text); color: var(--screen); }
+.req { margin-top: 20px; color: var(--ink-soft); font-size: 0.98rem; max-width: 62ch; }
+
+.todo { columns: 2; column-gap: 48px; max-width: 760px; padding: 0; margin: 0; list-style: none; }
+.todo li { break-inside: avoid; padding: 10px 0 10px 28px; position: relative; border-top: 1px solid var(--paper-deep); }
+.todo li::before { content: ""; position: absolute; left: 0; top: 17px; width: 12px; height: 12px; border: 2px solid var(--ink); }
+.todo li.done::before { background: var(--teal); border-color: var(--teal); }
+
+footer { border-top: 2px solid var(--ink); padding-top: 32px; padding-bottom: 56px; color: var(--ink-soft); font-size: 0.95rem; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 32px; justify-content: space-between; }
+
+@media (max-width: 860px) {
+  .spec { grid-template-columns: 1fr; border-left: 0; }
+  .spec > div { border-right: 0; border-top: 2px solid var(--ink); padding: 20px 0 12px; }
+  .spec > div:first-child { border-top: 0; padding-top: 4px; }
+  .split { grid-template-columns: 1fr; }
+  .todo { columns: 1; }
+  .term { grid-template-columns: minmax(0, 1fr); box-shadow: 6px 6px 0 var(--navy); }
+  .t-nicks { display: none; }
+  .t-log { border-right: 0; }
+}
+@media (max-width: 520px) {
+  .mast nav { gap: 14px; }
+  .term { height: 360px; }
+}
+@media (prefers-reduced-motion: reduce) { .caret { animation: none; } }
+</style>
+</head>
+<body>
+<header class="wrap mast">
+  <a class="logo" href="#top">Zirc</a>
+  <nav aria-label="Site">
+    <a href="#scripting">Scripting</a>
+    <a href="#install">Install</a>
+    <a href="https://github.com/Zaddiq/Zirc">GitHub</a>
+  </nav>
+</header>
+
+<main id="top">
+  <div class="wrap hero">
+    <h1>IRC you can script in JavaScript.</h1>
+    <p class="lede">Zirc is an IRC client for your terminal. Write a few lines of JavaScript to answer commands, greet people, or run timers, the way you once did with mIRC. It has no dependencies and runs anywhere Node does.</p>
+    <div class="actions">
+      <a class="btn" href="#install">Install Zirc</a>
+      <a class="btn alt" href="https://github.com/Zaddiq/Zirc">View source</a>
+    </div>
+
+    <div class="term-frame">
+      <div class="term" id="term" role="img" aria-label="A Zirc session in the channel #zirc-test. Bob asks for a dice bot, a script answers a roll, and a custom shout command prints in red.">
+        <div class="t-top" id="t-top"> #zirc-test: The test topic</div>
+        <div class="t-log" id="t-log" aria-hidden="true"></div>
+        <div class="t-nicks" id="t-nicks" aria-hidden="true"></div>
+        <div class="t-bar" id="t-bar"> [10:42] [me] [3:#zirc-test] [lag 0.1s]</div>
+        <div class="t-in" id="t-in" aria-hidden="true"><span class="pr">[#zirc-test] </span><span id="t-typed"></span><span class="caret"></span></div>
+      </div>
+      <button class="replay" id="replay" type="button">Replay the session</button>
+    </div>
+  </div>
+
+  <section id="features">
+    <div class="wrap">
+      <h2>Everything a daily-driver client needs</h2>
+      <p class="sub">Zirc covers connecting, chatting and keeping your scrollback. The details below are what v0.1 does today.</p>
+      <div class="spec">
+        <div>
+          <h3>Connection</h3>
+          <ul>
+            <li>TLS by default on port 6697</li>
+            <li>SASL PLAIN login, with the password read from an environment variable</li>
+            <li>IRCv3: server-time, multi-prefix, away-notify, account-notify, extended-join, chghost</li>
+            <li>Reconnects with backoff and rejoins your channels</li>
+            <li>An outgoing flood limiter so you don't get kicked for pasting</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Interface</h3>
+          <ul>
+            <li>Channel, private and server windows, with unread and highlight counts</li>
+            <li>A nicklist showing @ and + prefixes</li>
+            <li>mIRC colors, bold, italic, underline and reverse</li>
+            <li>Tab completes nicks, commands and channels</li>
+            <li>Per-window logs in plain text</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Everyday commands</h3>
+          <ul>
+            <li>Join, part, msg, query, me, nick, away, whois</li>
+            <li>Op, voice, kick, ban, topic, mode, invite</li>
+            <li>Ignore lists and custom highlight words</li>
+            <li>Your own aliases such as <code>/ns</code> that expand with <code>$1</code> and <code>$*</code></li>
+            <li><code>/timer</code> for repeating commands</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="scripting">
+    <div class="wrap">
+      <h2>Scripts are just JavaScript files</h2>
+      <p class="sub">Put a <code>.js</code> file in <code>~/.zirc/scripts</code> and type <code>/reload</code>. Your script gets a <code>zirc</code> object, plus <code>require</code> for anything in Node.</p>
+      <div class="split">
+<pre class="code" tabindex="0"><span class="tk-c">// dicebot.js</span>
+zirc.<span class="tk-f">on</span>(<span class="tk-s">'text'</span>, e <span class="tk-k">=&gt;</span> {
+  <span class="tk-k">if</span> (e.text.<span class="tk-f">startsWith</span>(<span class="tk-s">'!roll'</span>)) {
+    <span class="tk-k">const</span> sides = <span class="tk-f">parseInt</span>(e.text.<span class="tk-f">split</span>(<span class="tk-s">' '</span>)[<span class="tk-n">1</span>], <span class="tk-n">10</span>) || <span class="tk-n">6</span>;
+    <span class="tk-k">const</span> roll = <span class="tk-n">1</span> + Math.<span class="tk-f">floor</span>(Math.<span class="tk-f">random</span>() * sides);
+    e.<span class="tk-f">reply</span>(<span class="tk-s">`${e.nick} rolled ${roll} (d${sides})`</span>);
+  }
+});
+
+<span class="tk-c">// Adds a /shout command</span>
+zirc.<span class="tk-f">alias</span>(<span class="tk-s">'shout'</span>, (args, ctx) <span class="tk-k">=&gt;</span> {
+  ctx.<span class="tk-f">reply</span>(zirc.fmt.<span class="tk-f">bold</span>(
+    zirc.fmt.<span class="tk-f">color</span>(<span class="tk-n">4</span>, args.<span class="tk-f">toUpperCase</span>() + <span class="tk-s">'!'</span>)
+  ));
+});
+
+<span class="tk-c">// Remember when people last spoke</span>
+zirc.<span class="tk-f">on</span>(<span class="tk-s">'text'</span>, e <span class="tk-k">=&gt;</span> {
+  zirc.store.<span class="tk-f">set</span>(<span class="tk-s">'seen:'</span> + e.nick, Date.<span class="tk-f">now</span>());
+});</pre>
+        <div class="notes">
+          <p>Handle events like <code>text</code>, <code>join</code>, <code>kick</code>, <code>nick</code>, <code>mode</code> and <code>connect</code>. Return <code>false</code> from a handler to stop Zirc from showing or sending that event.</p>
+          <p>Aliases become slash commands. Timers clean themselves up when you reload. Each script gets its own JSON storage that survives restarts.</p>
+          <p>If a script throws, Zirc prints the error in your window and carries on. One bad script never takes the client down.</p>
+          <p>Scripts run with full access to your machine, just like mIRC scripts did. Only load code you trust.</p>
+        </div>
+      </div>
+      <table class="api">
+        <tbody>
+          <tr><th>zirc.on(event, fn)</th><td>Run code when something happens</td></tr>
+          <tr><th>zirc.alias(name, fn)</th><td>Add a <code>/name</code> command</td></tr>
+          <tr><th>zirc.every(ms, fn)</th><td>Repeat code on a timer; <code>zirc.after</code> runs it once</td></tr>
+          <tr><th>zirc.say(target, text)</th><td>Send a message; also <code>action</code> and <code>notice</code></td></tr>
+          <tr><th>zirc.store.get / set</th><td>Save data between sessions</td></tr>
+          <tr><th>zirc.fmt.color(n, text)</th><td>Build colored and bold IRC text</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="wrap">
+      <h2>Install in three commands</h2>
+      <p class="sub">You need Node 18 or newer. Zirc has no packages to install.</p>
+      <div class="steps">
+        <div class="cmd"><code><span class="dollar">$</span>git clone https://github.com/Zaddiq/Zirc</code><button class="copy" type="button" data-copy="git clone https://github.com/Zaddiq/Zirc">Copy</button></div>
+        <div class="cmd"><code><span class="dollar">$</span>cd Zirc</code><button class="copy" type="button" data-copy="cd Zirc">Copy</button></div>
+        <div class="cmd"><code><span class="dollar">$</span>node zirc.js irc.libera.chat -j '#zirc-test'</code><button class="copy" type="button" data-copy="node zirc.js irc.libera.chat -j '#zirc-test'">Copy</button></div>
+      </div>
+      <p class="req">Zirc creates <code>~/.zirc/config.json</code> on first run. Set your nick, servers, autojoin channels and SASL login there. Type <code>/help</code> inside Zirc for every command.</p>
+    </div>
+  </section>
+
+  <section id="status">
+    <div class="wrap">
+      <h2>Where it stands</h2>
+      <p class="sub">Zirc is version 0.1. The protocol layer and scripting engine are covered by automated tests that run against a fake IRC server. What's missing matters if you came from mIRC.</p>
+      <ul class="todo">
+        <li class="done">Connect, chat, reconnect</li>
+        <li class="done">JavaScript scripting</li>
+        <li class="done">Multiple servers</li>
+        <li class="done">Logs and highlights</li>
+        <li>DCC file transfers and chats</li>
+        <li>SASL EXTERNAL and SCRAM</li>
+        <li>IRCv3 chat history</li>
+        <li>A graphical window version</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Zirc is free software under the MIT license.</span>
+    <a href="https://github.com/Zaddiq/Zirc">github.com/Zaddiq/Zirc</a>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var log = $('t-log'), typed = $('t-typed'), nicks = $('t-nicks');
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var run = 0;
+
+  var cy = function (s) { return '<span class="c-cy">' + s + '</span>'; };
+  var or = function (s) { return '<span class="c-or">' + s + '</span>'; };
+  var gr = function (s) { return '<span class="c-gr">' + s + '</span>'; };
+  var rd = function (s) { return '<span class="c-rd b">' + s + '</span>'; };
+  var pu = function (s) { return '<span class="c-pu">' + s + '</span>'; };
+  var dim = function (s) { return '<span class="c-dim">' + s + '</span>'; };
+  var ts = function (t) { return '<span class="ts">[' + t + ']</span> '; };
+
+  var NICKS = '<div class="c-dim">4 users</div><div><span class="c-gr">@</span>' + gr('me') + '</div><div><span class="c-yl">+</span>' + cy('bob') + '</div><div>' + or('alice') + '</div><div>' + pu('carol') + '</div>';
+
+  // Each step: wait ms, then add a line, or type text into the input and send it.
+  var steps = [
+    { w: 500,  line: ts('10:41') + '<span class="c-gr">--&gt;</span> You have joined #zirc-test' },
+    { w: 400,  line: ts('10:41') + dim('*** Topic for #zirc-test:') + ' The test topic' },
+    { w: 900,  line: ts('10:41') + '&lt;<span class="c-yl">+</span>' + cy('bob') + '&gt; anyone got a dice bot?' },
+    { w: 800,  line: ts('10:41') + pu('*') + ' ' + or('alice') + ' rolls a die and squints at it' },
+    { w: 1000, line: ts('10:42') + '&lt;<span class="c-yl">+</span>' + cy('bob') + '&gt; !roll 20' },
+    { w: 350,  line: ts('10:42') + '&lt;<span class="c-gr">@</span>' + gr('me') + '&gt; bob rolled 17 (d20)' },
+    { w: 1100, type: '/shout ship it' },
+    { w: 150,  line: ts('10:42') + '&lt;<span class="c-gr">@</span>' + gr('me') + '&gt; ' + rd('SHIP IT!') },
+    { w: 900,  line: ts('10:42') + '&lt;' + pu('carol') + '&gt; nice, that was a script?' },
+    { w: 900,  type: 'yep, twelve lines of JavaScript' },
+    { w: 150,  line: ts('10:43') + '&lt;<span class="c-gr">@</span>' + gr('me') + '&gt; yep, twelve lines of JavaScript' }
+  ];
+
+  function add(html) {
+    var d = document.createElement('div');
+    d.innerHTML = html;
+    log.appendChild(d);
+    while (log.children.length > 40) log.removeChild(log.firstChild);
+  }
+  var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+
+  async function play() {
+    var id = ++run;
+    log.innerHTML = '';
+    typed.textContent = '';
+    nicks.innerHTML = NICKS;
+    for (var i = 0; i < steps.length; i++) {
+      var s = steps[i];
+      if (reduce) {
+        if (s.line) add(s.line);
+        continue;
+      }
+      await sleep(s.w);
+      if (id !== run) return;
+      if (s.type) {
+        for (var k = 1; k <= s.type.length; k++) {
+          typed.textContent = s.type.slice(0, k);
+          await sleep(38 + Math.random() * 40);
+          if (id !== run) return;
+        }
+        await sleep(280);
+        if (id !== run) return;
+        typed.textContent = '';
+      } else {
+        add(s.line);
+      }
+    }
+  }
+
+  $('replay').addEventListener('click', play);
+  play();
+
+  var btns = document.querySelectorAll('.copy');
+  Array.prototype.forEach.call(btns, function (b) {
+    b.addEventListener('click', function () {
+      var text = b.getAttribute('data-copy');
+      var done = function () { b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy'; }, 1400); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () { b.textContent = 'Press Ctrl+C'; });
+      else b.textContent = 'Select and copy';
+    });
+  });
+})();
+</script>
+</body>
+</html>

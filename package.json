@@ -1,0 +1,10 @@
+{
+  "name": "zirc",
+  "version": "0.1.0",
+  "description": "Terminal IRC client with mIRC-style JavaScript scripting",
+  "bin": { "zirc": "zirc.js" },
+  "main": "zirc.js",
+  "scripts": { "start": "node zirc.js", "test": "node test/test.js" },
+  "engines": { "node": ">=18" },
+  "license": "MIT"
+}
