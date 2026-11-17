@@ -1,6 +1,9 @@
 # Zirc
 
-A terminal IRC client with mIRC-style scripting, in JavaScript. Zero dependencies, Node 18+.
+An IRC client with mIRC-style scripting, in JavaScript. It comes in two forms:
+
+- **Web client** (`docs/index.html`): one self-contained page. Open it in a browser, or host it with GitHub Pages. It connects over WebSocket, so it needs a server that accepts WebSocket (for example Ergo's test network). Scripts are written in a built-in editor and stored in your browser.
+- **Terminal client** (`zirc.js`): zero dependencies, Node 18+. Speaks normal IRC (TLS, SASL) to any network.
 
 ```
 node zirc.js                                  # start, then /server irc.libera.chat
@@ -10,7 +13,9 @@ node zirc.js --no-tls localhost 6667
 
 TLS is the default (port 6697). Config, scripts, logs and script storage live in `~/.zirc` (override with `ZIRC_HOME`).
 
-## What works (v0.1)
+## Terminal client
+
+### What works (v0.1)
 
 - TLS, SASL PLAIN, IRCv3 caps (server-time, multi-prefix, away-notify, account-notify, extended-join, userhost-in-names, chghost, invite-notify)
 - Auto-reconnect with backoff and rejoin, ping timeout detection, lag meter, outgoing flood limiter
@@ -66,4 +71,5 @@ Event objects carry `nick, user, host, channel, text, server, me` where relevant
 
 ## Tests
 
-`node test/test.js` runs protocol, formatting and scripting tests against a fake IRC server.
+- `node test/test.js` runs protocol, formatting and scripting tests for the terminal client against a fake IRC server.
+- `node test/web.test.js` drives the web client in Chromium against a fake WebSocket IRC server. It needs Playwright (`npm i playwright`), which is not a dependency of Zirc itself.

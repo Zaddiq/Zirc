@@ -2,11 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Zirc: IRC client with JavaScript scripting</title>
-<meta name="description" content="Zirc is a terminal IRC client you script in JavaScript. TLS, SASL, IRCv3, mIRC colors, and no dependencies.">
-<meta property="og:title" content="Zirc">
-<meta property="og:description" content="A terminal IRC client you script in JavaScript.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zirc: IRC in your browser</title>
+<meta name="description" content="Zirc is an IRC client that runs in one web page. Connect over WebSocket and script it in JavaScript.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%231a1f7a'/%3E%3Cpath d='M8 9h16v3.2L13.4 20H24v3H8v-3.2L18.6 12H8z' fill='%23fff'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,9 +16,14 @@
   --ink: #0f1b3d;
   --ink-soft: #46506c;
   --navy: #1a1f7a;
+  --side: #1a1f7a;
+  --side-text: #e8eaff;
+  --side-dim: #aab0ee;
+  --side-active: #0f1450;
   --teal: #006d6d;
   --flame: #c2410c;
   --screen: #12141a;
+  --screen-raise: #1b1e27;
   --screen-line: #2a2e3a;
   --screen-text: #d8dbe3;
   --screen-dim: #7d8497;
@@ -29,394 +32,1717 @@
   --gutter: clamp(16px, 4vw, 48px);
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root {
     --paper: #0e1226;
     --paper-deep: #171c36;
     --ink: #e6e9f5;
     --ink-soft: #a2aac6;
     --navy: #8f97ff;
+    --side: #121735;
+    --side-active: #1f2656;
     --teal: #4fd1c5;
     --flame: #ff9a62;
   }
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
-body {
-  margin: 0;
-  background: var(--paper);
-  color: var(--ink);
-  font: 400 1.0625rem/1.6 var(--sans);
-  font-stretch: 100%;
-}
-a { color: var(--teal); text-underline-offset: 3px; text-decoration-thickness: 1px; }
-a:hover { text-decoration-thickness: 2px; }
-:focus-visible { outline: 3px solid var(--flame); outline-offset: 3px; }
-.wrap { max-width: 1120px; margin: 0 auto; padding: 0 var(--gutter); }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 1rem/1.55 var(--sans); }
+a { color: var(--teal); text-underline-offset: 3px; }
+:focus-visible { outline: 3px solid var(--flame); outline-offset: 2px; }
+button { font: inherit; cursor: pointer; }
 
-/* ---- masthead */
-.mast { display: flex; justify-content: space-between; align-items: baseline; padding-top: 28px; }
-.logo { font: 800 1.5rem/1 var(--sans); font-stretch: 125%; letter-spacing: -0.02em; color: var(--ink); text-decoration: none; }
-.mast nav { display: flex; gap: 22px; font-size: 0.95rem; }
-.mast nav a { color: var(--ink-soft); text-decoration: none; }
-.mast nav a:hover { color: var(--ink); text-decoration: underline; }
-
-/* ---- hero */
-.hero { padding-top: clamp(40px, 7vw, 88px); padding-bottom: clamp(32px, 5vw, 56px); }
-h1 {
-  margin: 0;
-  font: 900 clamp(2.5rem, 7.2vw, 5.6rem)/0.98 var(--sans);
-  font-stretch: 125%;
-  letter-spacing: -0.035em;
-  max-width: 14ch;
+/* ------------------------------------------------ connect screen */
+.connect { position: fixed; inset: 0; overflow: auto; background: var(--paper); z-index: 20; }
+.connect-in { max-width: 1040px; margin: 0 auto; padding: clamp(28px, 6vw, 72px) var(--gutter) 64px; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: clamp(28px, 6vw, 80px); align-items: start; }
+.brand { font: 800 1.5rem/1 var(--sans); font-stretch: 125%; letter-spacing: -0.02em; margin: 0 0 clamp(28px, 5vw, 56px); }
+.connect h1 { margin: 0; font: 900 clamp(2.3rem, 5.4vw, 4.2rem)/1 var(--sans); font-stretch: 125%; letter-spacing: -0.035em; }
+.connect .lede { margin: 22px 0 0; font-size: 1.15rem; color: var(--ink-soft); max-width: 46ch; }
+.facts { margin: 28px 0 0; padding: 0; list-style: none; max-width: 52ch; }
+.facts li { padding: 10px 0; border-top: 1px solid var(--paper-deep); color: var(--ink-soft); }
+.facts b { color: var(--ink); font-weight: 600; }
+.panel { background: var(--screen); color: var(--screen-text); border: 2px solid var(--ink); box-shadow: 10px 10px 0 var(--navy); padding: 26px; }
+@media (prefers-color-scheme: dark) { .panel { border-color: var(--screen-line); box-shadow: 10px 10px 0 #2b3190; } }
+.panel h2 { margin: 0 0 18px; font: 800 1.35rem/1.2 var(--sans); font-stretch: 112%; }
+.field { display: block; margin: 0 0 14px; }
+.field > span { display: block; margin-bottom: 5px; font-size: 0.9rem; color: var(--screen-dim); }
+.field input, .field select {
+  width: 100%; padding: 10px 12px; font: 400 0.95rem var(--mono); color: var(--screen-text);
+  background: var(--screen-raise); border: 1px solid var(--screen-line); border-radius: 0;
 }
-.lede { margin: 28px 0 0; max-width: 54ch; font-size: clamp(1.1rem, 1.6vw, 1.3rem); color: var(--ink-soft); }
-.actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 32px; align-items: center; }
-.btn {
-  display: inline-block; padding: 13px 22px; font: 600 1rem/1 var(--sans);
-  background: var(--navy); color: #fff; text-decoration: none; border: 2px solid var(--navy);
-}
-.btn:hover { background: var(--ink); border-color: var(--ink); }
-.btn.alt { background: transparent; color: var(--ink); border-color: var(--ink); }
-.btn.alt:hover { background: var(--ink); color: var(--paper); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .btn { color: #0e1226; }
-  :root:not([data-theme="light"]) .btn:hover { background: var(--ink); }
-  :root:not([data-theme="light"]) .btn.alt { color: var(--ink); }
-  :root:not([data-theme="light"]) .btn.alt:hover { color: var(--paper); }
-}
+.field input:focus, .field select:focus { outline: 2px solid #f4a259; outline-offset: 1px; border-color: #f4a259; }
+.field small { display: block; margin-top: 5px; color: var(--screen-dim); font-size: 0.82rem; line-height: 1.4; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.go { width: 100%; margin-top: 6px; padding: 13px 18px; font-weight: 700; color: #12141a; background: #f4a259; border: 0; }
+.go:hover { background: #ffb870; }
+.go.alt { background: transparent; color: var(--screen-text); border: 1px solid var(--screen-dim); }
+.go.alt:hover { background: var(--screen-line); }
+.err { margin: 12px 0 0; color: #ff8f8f; font-size: 0.92rem; min-height: 1.2em; }
+.panel details { margin-top: 14px; color: var(--screen-dim); font-size: 0.88rem; }
+.panel summary { cursor: pointer; }
+.panel details p { margin: 8px 0 0; line-height: 1.5; }
+.panel code, .facts code { font: 400 0.9em var(--mono); }
+.back { margin: 14px 0 0; font-size: 0.9rem; }
+.back button { background: none; border: 0; padding: 0; color: #f4a259; text-decoration: underline; text-underline-offset: 3px; }
 
-/* ---- terminal (the one memorable thing) */
-.term-frame { margin-top: clamp(32px, 5vw, 56px); }
-.term {
-  background: var(--screen); color: var(--screen-text);
-  font: 400 clamp(11.5px, 1.45vw, 14.5px)/1.45 var(--mono);
-  box-shadow: 10px 10px 0 var(--navy);
-  border: 2px solid var(--ink);
-  display: grid; grid-template-columns: minmax(0, 1fr) 17ch; grid-template-rows: auto minmax(0, 1fr) auto auto;
-  height: clamp(330px, 46vw, 440px);
+/* ------------------------------------------------ app shell */
+.app { display: grid; grid-template-columns: 220px minmax(0, 1fr) 200px; height: 100vh; height: 100dvh; background: var(--screen); }
+.side { background: var(--side); color: var(--side-text); display: flex; flex-direction: column; min-height: 0; }
+.side .logo { padding: 16px 18px 10px; font: 800 1.35rem/1 var(--sans); font-stretch: 125%; letter-spacing: -0.02em; }
+.wins { list-style: none; margin: 0; padding: 6px 0; overflow-y: auto; flex: 1; min-height: 0; }
+.win {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%;
+  padding: 7px 18px; background: none; border: 0; color: var(--side-dim); text-align: left; font: 400 0.95rem/1.3 var(--sans);
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .term { border-color: var(--screen-line); box-shadow: 10px 10px 0 #2b3190; }
-}
-.term > * { min-width: 0; }
-.t-top, .t-bar { grid-column: 1 / -1; background: #d8dbe3; color: #12141a; padding: 0 1ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.t-log { min-height: 0; padding: 8px 1ch 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; border-right: 1px solid var(--screen-line); }
-.t-log div { padding-left: 8.5ch; text-indent: -8.5ch; overflow-wrap: anywhere; }
-.t-nicks { padding: 8px 1ch 0; overflow: hidden; white-space: nowrap; }
-.t-nicks .n { color: var(--screen-dim); }
-.t-in { grid-column: 1 / -1; padding: 0 1ch; white-space: pre; overflow: hidden; border-top: 1px solid var(--screen-line); }
-.t-in .pr { color: var(--screen-dim); }
-.caret { display: inline-block; width: 1ch; background: var(--screen-text); height: 1.1em; vertical-align: text-bottom; animation: blink 1.1s steps(1) infinite; }
-@keyframes blink { 50% { opacity: 0; } }
-.ts { color: var(--screen-dim); }
-.c-cy { color: #4cc9d6; } .c-or { color: #f4a259; } .c-gr { color: #5fd38d; } .c-rd { color: #ff6b6b; } .c-pu { color: #c792ea; } .c-dim { color: var(--screen-dim); } .c-yl { color: #f2d45c; }
-.b { font-weight: 600; }
-.replay {
-  margin-top: 22px; background: none; border: 0; padding: 0; font: inherit; font-size: 0.95rem;
-  color: var(--teal); cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
-}
-.replay:hover { text-decoration-thickness: 2px; }
+.win .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.win:hover { color: var(--side-text); background: var(--side-active); }
+.win[aria-current="true"] { background: var(--side-active); color: #fff; font-weight: 600; box-shadow: inset 3px 0 0 #f4a259; }
+.win.unread .nm { color: #fff; font-weight: 600; }
+.badge { flex: none; min-width: 20px; padding: 1px 6px; font-size: 0.78rem; text-align: center; background: #3a43b8; color: #fff; }
+.badge.hl { background: #f4a259; color: #12141a; font-weight: 700; }
+.side-foot { display: flex; flex-direction: column; gap: 8px; padding: 12px 18px 16px; border-top: 1px solid rgba(255,255,255,0.14); }
+.side-foot button { padding: 9px 12px; font-size: 0.9rem; font-weight: 600; text-align: left; white-space: nowrap; background: transparent; color: var(--side-text); border: 1px solid var(--side-dim); }
+.side-foot button:hover { background: var(--side-text); color: #12141a; }
+.dot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; background: #7d8497; }
+.dot.on { background: #5fd38d; } .dot.wait { background: #f2d45c; }
 
-/* ---- sections */
-section { padding-top: clamp(48px, 7vw, 96px); padding-bottom: clamp(48px, 7vw, 96px); border-top: 2px solid var(--ink); }
-h2 { margin: 0 0 12px; font: 800 clamp(1.8rem, 3.6vw, 2.7rem)/1.05 var(--sans); font-stretch: 112%; letter-spacing: -0.025em; max-width: 20ch; }
-.sub { margin: 0 0 40px; color: var(--ink-soft); max-width: 58ch; }
+.center { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; min-height: 0; background: var(--screen); color: var(--screen-text); }
+.topic { display: flex; align-items: center; gap: 12px; padding: 9px 14px; background: #d8dbe3; color: #12141a; font: 400 0.9rem/1.4 var(--mono); min-height: 40px; }
+.topic .tt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topic .tt b { font-weight: 600; margin-right: 1ch; }
+.users-btn { display: none; flex: none; position: relative; z-index: 11; padding: 6px 12px; background: #12141a; color: #d8dbe3; border: 0; font-size: 0.85rem; }
+.log { overflow-y: auto; padding: 10px 14px; font: 400 14px/1.5 var(--mono); overscroll-behavior: contain; scroll-behavior: auto; }
+.line { padding-left: 9ch; text-indent: -9ch; overflow-wrap: anywhere; white-space: pre-wrap; }
+.line.hl { background: rgba(244, 162, 89, 0.16); box-shadow: inset 3px 0 0 #f4a259; }
+.line .ts { color: var(--screen-dim); }
+.line a { color: #82aaff; }
+.b { font-weight: 600; } .i { font-style: italic; } .u { text-decoration: underline; } .s { text-decoration: line-through; } .u.s { text-decoration: underline line-through; }
+.inputbar { display: flex; gap: 0; border-top: 1px solid var(--screen-line); background: var(--screen-raise); }
+.inputbar .pr { flex: none; max-width: 30%; padding: 12px 0 12px 14px; color: var(--screen-dim); font: 400 14px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inputbar input { flex: 1; min-width: 0; padding: 12px 14px 12px 8px; font: 400 16px var(--mono); color: var(--screen-text); background: transparent; border: 0; outline: 0; }
+.inputbar:focus-within { box-shadow: inset 0 2px 0 #f4a259; }
+.inputbar button { flex: none; padding: 0 18px; background: #f4a259; color: #12141a; border: 0; font-weight: 700; }
+.nicks { background: var(--screen); color: var(--screen-text); border-left: 1px solid var(--screen-line); overflow-y: auto; padding: 10px 14px; font: 400 13.5px/1.55 var(--mono); min-height: 0; }
+.nicks .cnt { color: var(--screen-dim); margin-bottom: 6px; }
+.nicks div.n { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nicks button.n { display: block; width: 100%; padding: 0; background: none; border: 0; font: inherit; text-align: left; color: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nicks button.n:hover { background: var(--screen-line); }
+.pfx-o { color: #5fd38d; } .pfx-v { color: #f2d45c; } .pfx-h { color: #4cc9d6; } .pfx-a { color: #ff6b6b; } .pfx-q { color: #c792ea; }
 
-.spec { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-left: 2px solid var(--ink); }
-.spec > div { padding: 4px 28px 8px; border-right: 2px solid var(--ink); }
-.spec > div:first-child { border-left: 0; }
-.spec h3 { margin: 0 0 14px; font: 700 1.2rem/1.2 var(--sans); font-stretch: 112%; }
-.spec ul { margin: 0; padding: 0; list-style: none; }
-.spec li { padding: 8px 0; border-top: 1px solid var(--paper-deep); font-size: 1rem; line-height: 1.45; }
-.spec li:first-child { border-top: 0; }
+/* ------------------------------------------------ script editor */
+dialog.scripts { width: min(860px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 2px solid var(--ink); background: var(--screen); color: var(--screen-text); }
+dialog.scripts::backdrop { background: rgba(8, 10, 24, 0.7); }
+.sd-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--screen-line); }
+.sd-head h2 { margin: 0 12px 0 0; font: 800 1.15rem var(--sans); font-stretch: 112%; }
+.sd-head select, .sd-head input { padding: 7px 10px; font: 400 0.9rem var(--mono); color: var(--screen-text); background: var(--screen-raise); border: 1px solid var(--screen-line); border-radius: 0; }
+.sd-head button, .sd-foot button { padding: 7px 12px; font-size: 0.88rem; font-weight: 600; color: var(--screen-text); background: transparent; border: 1px solid var(--screen-dim); }
+.sd-head button:hover, .sd-foot button:hover { background: var(--screen-line); }
+.sd-foot button.primary { background: #f4a259; color: #12141a; border-color: #f4a259; }
+.sd-warn { margin: 0; padding: 10px 16px; font-size: 0.86rem; line-height: 1.45; color: #f2d45c; background: rgba(242, 212, 92, 0.08); }
+.sd-code { display: block; width: 100%; height: min(46dvh, 420px); padding: 14px 16px; font: 400 13px/1.55 var(--mono); color: var(--screen-text); background: #0c0e13; border: 0; resize: vertical; tab-size: 2; }
+.sd-code:focus-visible { outline-offset: -3px; }
+.sd-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 16px; border-top: 1px solid var(--screen-line); }
+.sd-foot .msg { flex: 1; min-width: 120px; font-size: 0.86rem; color: var(--screen-dim); }
+.sd-foot .msg.bad { color: #ff8f8f; }
 
-.split { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: clamp(28px, 5vw, 64px); align-items: start; }
-pre.code {
-  margin: 0; padding: 22px 24px; background: var(--screen); color: var(--screen-text);
-  font: 400 clamp(12px, 1.3vw, 14px)/1.6 var(--mono); overflow-x: auto; border: 2px solid var(--ink);
-  tab-size: 2;
-}
-.tk-k { color: #c792ea; } .tk-s { color: #a8e08a; } .tk-c { color: #7d8497; font-style: italic; } .tk-f { color: #82aaff; } .tk-n { color: #f4a259; }
-.notes p { margin: 0 0 18px; }
-.notes p:last-child { margin: 0; }
-code { font: 400 0.92em var(--mono); background: var(--paper-deep); padding: 1px 6px; }
-.api { margin-top: 28px; width: 100%; border-collapse: collapse; font-size: 0.95rem; }
-.api th, .api td { text-align: left; padding: 9px 12px 9px 0; border-top: 1px solid var(--paper-deep); vertical-align: top; }
-.api th { font: 400 0.9rem var(--mono); white-space: nowrap; color: var(--navy); }
-
-.steps { display: grid; gap: 14px; max-width: 720px; }
-.cmd {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  background: var(--screen); color: var(--screen-text); border: 2px solid var(--ink);
-  padding: 14px 16px 14px 20px; font: 400 clamp(12px, 1.5vw, 15px)/1.4 var(--mono); overflow: hidden;
-}
-.cmd code { background: none; padding: 0; font: inherit; white-space: pre; overflow-x: auto; }
-.cmd .dollar { color: var(--screen-dim); margin-right: 1ch; user-select: none; }
-.copy {
-  flex: none; font: 600 0.85rem var(--sans); padding: 7px 12px; cursor: pointer;
-  background: transparent; color: var(--screen-text); border: 1px solid var(--screen-dim);
-}
-.copy:hover { background: var(--screen-text); color: var(--screen); }
-.req { margin-top: 20px; color: var(--ink-soft); font-size: 0.98rem; max-width: 62ch; }
-
-.todo { columns: 2; column-gap: 48px; max-width: 760px; padding: 0; margin: 0; list-style: none; }
-.todo li { break-inside: avoid; padding: 10px 0 10px 28px; position: relative; border-top: 1px solid var(--paper-deep); }
-.todo li::before { content: ""; position: absolute; left: 0; top: 17px; width: 12px; height: 12px; border: 2px solid var(--ink); }
-.todo li.done::before { background: var(--teal); border-color: var(--teal); }
-
-footer { border-top: 2px solid var(--ink); padding-top: 32px; padding-bottom: 56px; color: var(--ink-soft); font-size: 0.95rem; }
-footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 32px; justify-content: space-between; }
-
+/* ------------------------------------------------ small screens */
 @media (max-width: 860px) {
-  .spec { grid-template-columns: 1fr; border-left: 0; }
-  .spec > div { border-right: 0; border-top: 2px solid var(--ink); padding: 20px 0 12px; }
-  .spec > div:first-child { border-top: 0; padding-top: 4px; }
-  .split { grid-template-columns: 1fr; }
-  .todo { columns: 1; }
-  .term { grid-template-columns: minmax(0, 1fr); box-shadow: 6px 6px 0 var(--navy); }
-  .t-nicks { display: none; }
-  .t-log { border-right: 0; }
+  .connect-in { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .connect-in > div:first-child { display: contents; }
+  .brand { margin-bottom: 28px; }
+  .connect .lede { margin-bottom: 36px; }
+  .panel { order: 1; box-shadow: 6px 6px 0 var(--navy); margin-right: 8px; }
+  .facts { order: 2; margin-top: 40px; }
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .side { flex-direction: row; align-items: stretch; overflow: hidden; }
+  .side .logo { display: none; }
+  .wins { display: flex; flex-direction: row; overflow-x: auto; overflow-y: hidden; padding: 0; }
+  .win { width: auto; flex: none; padding: 12px 14px; }
+  .win[aria-current="true"] { box-shadow: inset 0 -3px 0 #f4a259; }
+  .side-foot { flex-direction: row; flex: none; padding: 6px 10px; border-top: 0; border-left: 1px solid rgba(255,255,255,0.14); align-items: center; }
+  .side-foot button { padding: 8px 10px; }
+  .nicks { display: none; position: fixed; right: 0; bottom: 0; top: 0; width: min(72vw, 280px); z-index: 10; box-shadow: -8px 0 24px rgba(0,0,0,0.5); padding-top: 132px; }
+  .app.nicks-open .nicks { display: block; }
+  .users-btn { display: block; }
+  .center { grid-row: 2; }
+  .inputbar .pr { display: none; }
+  .inputbar input { padding-left: 14px; }
+  .inputbar button { padding: 0 22px; }
 }
-@media (max-width: 520px) {
-  .mast nav { gap: 14px; }
-  .term { height: 360px; }
-}
-@media (prefers-reduced-motion: reduce) { .caret { animation: none; } }
 </style>
 </head>
 <body>
-<header class="wrap mast">
-  <a class="logo" href="#top">Zirc</a>
-  <nav aria-label="Site">
-    <a href="#scripting">Scripting</a>
-    <a href="#install">Install</a>
-    <a href="https://github.com/Zaddiq/Zirc">GitHub</a>
-  </nav>
-</header>
 
-<main id="top">
-  <div class="wrap hero">
-    <h1>IRC you can script in JavaScript.</h1>
-    <p class="lede">Zirc is an IRC client for your terminal. Write a few lines of JavaScript to answer commands, greet people, or run timers, the way you once did with mIRC. It has no dependencies and runs anywhere Node does.</p>
-    <div class="actions">
-      <a class="btn" href="#install">Install Zirc</a>
-      <a class="btn alt" href="https://github.com/Zaddiq/Zirc">View source</a>
-    </div>
-
-    <div class="term-frame">
-      <div class="term" id="term" role="img" aria-label="A Zirc session in the channel #zirc-test. Bob asks for a dice bot, a script answers a roll, and a custom shout command prints in red.">
-        <div class="t-top" id="t-top"> #zirc-test: The test topic</div>
-        <div class="t-log" id="t-log" aria-hidden="true"></div>
-        <div class="t-nicks" id="t-nicks" aria-hidden="true"></div>
-        <div class="t-bar" id="t-bar"> [10:42] [me] [3:#zirc-test] [lag 0.1s]</div>
-        <div class="t-in" id="t-in" aria-hidden="true"><span class="pr">[#zirc-test] </span><span id="t-typed"></span><span class="caret"></span></div>
-      </div>
-      <button class="replay" id="replay" type="button">Replay the session</button>
-    </div>
-  </div>
-
-  <section id="features">
-    <div class="wrap">
-      <h2>Everything a daily-driver client needs</h2>
-      <p class="sub">Zirc covers connecting, chatting and keeping your scrollback. The details below are what v0.1 does today.</p>
-      <div class="spec">
-        <div>
-          <h3>Connection</h3>
-          <ul>
-            <li>TLS by default on port 6697</li>
-            <li>SASL PLAIN login, with the password read from an environment variable</li>
-            <li>IRCv3: server-time, multi-prefix, away-notify, account-notify, extended-join, chghost</li>
-            <li>Reconnects with backoff and rejoins your channels</li>
-            <li>An outgoing flood limiter so you don't get kicked for pasting</li>
-          </ul>
-        </div>
-        <div>
-          <h3>Interface</h3>
-          <ul>
-            <li>Channel, private and server windows, with unread and highlight counts</li>
-            <li>A nicklist showing @ and + prefixes</li>
-            <li>mIRC colors, bold, italic, underline and reverse</li>
-            <li>Tab completes nicks, commands and channels</li>
-            <li>Per-window logs in plain text</li>
-          </ul>
-        </div>
-        <div>
-          <h3>Everyday commands</h3>
-          <ul>
-            <li>Join, part, msg, query, me, nick, away, whois</li>
-            <li>Op, voice, kick, ban, topic, mode, invite</li>
-            <li>Ignore lists and custom highlight words</li>
-            <li>Your own aliases such as <code>/ns</code> that expand with <code>$1</code> and <code>$*</code></li>
-            <li><code>/timer</code> for repeating commands</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section id="scripting">
-    <div class="wrap">
-      <h2>Scripts are just JavaScript files</h2>
-      <p class="sub">Put a <code>.js</code> file in <code>~/.zirc/scripts</code> and type <code>/reload</code>. Your script gets a <code>zirc</code> object, plus <code>require</code> for anything in Node.</p>
-      <div class="split">
-<pre class="code" tabindex="0"><span class="tk-c">// dicebot.js</span>
-zirc.<span class="tk-f">on</span>(<span class="tk-s">'text'</span>, e <span class="tk-k">=&gt;</span> {
-  <span class="tk-k">if</span> (e.text.<span class="tk-f">startsWith</span>(<span class="tk-s">'!roll'</span>)) {
-    <span class="tk-k">const</span> sides = <span class="tk-f">parseInt</span>(e.text.<span class="tk-f">split</span>(<span class="tk-s">' '</span>)[<span class="tk-n">1</span>], <span class="tk-n">10</span>) || <span class="tk-n">6</span>;
-    <span class="tk-k">const</span> roll = <span class="tk-n">1</span> + Math.<span class="tk-f">floor</span>(Math.<span class="tk-f">random</span>() * sides);
-    e.<span class="tk-f">reply</span>(<span class="tk-s">`${e.nick} rolled ${roll} (d${sides})`</span>);
-  }
-});
-
-<span class="tk-c">// Adds a /shout command</span>
-zirc.<span class="tk-f">alias</span>(<span class="tk-s">'shout'</span>, (args, ctx) <span class="tk-k">=&gt;</span> {
-  ctx.<span class="tk-f">reply</span>(zirc.fmt.<span class="tk-f">bold</span>(
-    zirc.fmt.<span class="tk-f">color</span>(<span class="tk-n">4</span>, args.<span class="tk-f">toUpperCase</span>() + <span class="tk-s">'!'</span>)
-  ));
-});
-
-<span class="tk-c">// Remember when people last spoke</span>
-zirc.<span class="tk-f">on</span>(<span class="tk-s">'text'</span>, e <span class="tk-k">=&gt;</span> {
-  zirc.store.<span class="tk-f">set</span>(<span class="tk-s">'seen:'</span> + e.nick, Date.<span class="tk-f">now</span>());
-});</pre>
-        <div class="notes">
-          <p>Handle events like <code>text</code>, <code>join</code>, <code>kick</code>, <code>nick</code>, <code>mode</code> and <code>connect</code>. Return <code>false</code> from a handler to stop Zirc from showing or sending that event.</p>
-          <p>Aliases become slash commands. Timers clean themselves up when you reload. Each script gets its own JSON storage that survives restarts.</p>
-          <p>If a script throws, Zirc prints the error in your window and carries on. One bad script never takes the client down.</p>
-          <p>Scripts run with full access to your machine, just like mIRC scripts did. Only load code you trust.</p>
-        </div>
-      </div>
-      <table class="api">
-        <tbody>
-          <tr><th>zirc.on(event, fn)</th><td>Run code when something happens</td></tr>
-          <tr><th>zirc.alias(name, fn)</th><td>Add a <code>/name</code> command</td></tr>
-          <tr><th>zirc.every(ms, fn)</th><td>Repeat code on a timer; <code>zirc.after</code> runs it once</td></tr>
-          <tr><th>zirc.say(target, text)</th><td>Send a message; also <code>action</code> and <code>notice</code></td></tr>
-          <tr><th>zirc.store.get / set</th><td>Save data between sessions</td></tr>
-          <tr><th>zirc.fmt.color(n, text)</th><td>Build colored and bold IRC text</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <section id="install">
-    <div class="wrap">
-      <h2>Install in three commands</h2>
-      <p class="sub">You need Node 18 or newer. Zirc has no packages to install.</p>
-      <div class="steps">
-        <div class="cmd"><code><span class="dollar">$</span>git clone https://github.com/Zaddiq/Zirc</code><button class="copy" type="button" data-copy="git clone https://github.com/Zaddiq/Zirc">Copy</button></div>
-        <div class="cmd"><code><span class="dollar">$</span>cd Zirc</code><button class="copy" type="button" data-copy="cd Zirc">Copy</button></div>
-        <div class="cmd"><code><span class="dollar">$</span>node zirc.js irc.libera.chat -j '#zirc-test'</code><button class="copy" type="button" data-copy="node zirc.js irc.libera.chat -j '#zirc-test'">Copy</button></div>
-      </div>
-      <p class="req">Zirc creates <code>~/.zirc/config.json</code> on first run. Set your nick, servers, autojoin channels and SASL login there. Type <code>/help</code> inside Zirc for every command.</p>
-    </div>
-  </section>
-
-  <section id="status">
-    <div class="wrap">
-      <h2>Where it stands</h2>
-      <p class="sub">Zirc is version 0.1. The protocol layer and scripting engine are covered by automated tests that run against a fake IRC server. What's missing matters if you came from mIRC.</p>
-      <ul class="todo">
-        <li class="done">Connect, chat, reconnect</li>
-        <li class="done">JavaScript scripting</li>
-        <li class="done">Multiple servers</li>
-        <li class="done">Logs and highlights</li>
-        <li>DCC file transfers and chats</li>
-        <li>SASL EXTERNAL and SCRAM</li>
-        <li>IRCv3 chat history</li>
-        <li>A graphical window version</li>
+<div class="connect" id="connect">
+  <div class="connect-in">
+    <div>
+      <p class="brand">Zirc</p>
+      <h1>IRC in one web page.</h1>
+      <p class="lede">Connect to a chat server from this tab, join channels, and script the client in JavaScript. Nothing to install and no account with us.</p>
+      <ul class="facts">
+        <li><b>Connects straight from your browser</b> over WebSocket. Your messages go to the server you pick and nowhere else.</li>
+        <li><b>Scripts are plain JavaScript.</b> Write them in the built-in editor. They answer commands, greet people, and run timers, like mIRC scripts did.</li>
+        <li><b>Needs a server that accepts WebSocket.</b> Many large networks don't. See the note under the form.</li>
+        <li>Prefer a terminal? <a href="https://github.com/Zaddiq/Zirc">Zirc for Node</a> speaks normal IRC to any network.</li>
       </ul>
     </div>
-  </section>
-</main>
 
-<footer>
-  <div class="wrap">
-    <span>Zirc is free software under the MIT license.</span>
-    <a href="https://github.com/Zaddiq/Zirc">github.com/Zaddiq/Zirc</a>
+    <form class="panel" id="cform" autocomplete="off" novalidate>
+      <h2 id="ctitle">Connect</h2>
+      <label class="field"><span>Server</span>
+        <select id="preset">
+          <option value="wss://testnet.ergo.chat/webirc">Ergo test network</option>
+          <option value="">Other WebSocket server</option>
+        </select>
+      </label>
+      <label class="field"><span>WebSocket address</span>
+        <input id="url" type="text" inputmode="url" spellcheck="false" placeholder="wss://irc.example.org/webirc" required>
+        <small id="urlnote">The Ergo test network logs all traffic for debugging. Don't use a real password there.</small>
+      </label>
+      <div class="row2">
+        <label class="field"><span>Nickname</span><input id="nick" type="text" spellcheck="false" maxlength="32" required></label>
+        <label class="field"><span>Channels to join</span><input id="chans" type="text" spellcheck="false" placeholder="#zirc-test"></label>
+      </div>
+      <details>
+        <summary>Log in to an account (optional)</summary>
+        <div class="row2" style="margin-top:12px">
+          <label class="field"><span>Account name</span><input id="sasluser" type="text" spellcheck="false" autocomplete="off"></label>
+          <label class="field"><span>Password</span><input id="saslpass" type="password" autocomplete="off"></label>
+        </div>
+        <p>The password is sent with SASL and kept only in this tab's memory. It is never saved.</p>
+      </details>
+      <button class="go" type="submit" id="gobtn">Connect</button>
+      <button class="go alt" type="button" id="discbtn" hidden>Disconnect</button>
+      <p class="err" id="cerr" role="alert"></p>
+      <details>
+        <summary>Why can't I connect to Libera, OFTC or Rizon?</summary>
+        <p>Browsers can only open WebSocket connections, not the plain TCP sockets that most IRC networks use. A network has to run a WebSocket listener, or you need a gateway such as <code>webircgateway</code> in front of it. If you know a WebSocket address, paste it above.</p>
+      </details>
+      <p class="back" id="back" hidden><button type="button" id="backbtn">Back to chat</button></p>
+    </form>
   </div>
-</footer>
+</div>
+
+<div class="app" id="app" hidden>
+  <aside class="side" aria-label="Windows">
+    <div class="logo">Zirc</div>
+    <ul class="wins" id="wins"></ul>
+    <div class="side-foot">
+      <button type="button" id="btn-conn"><span class="dot" id="dot"></span>Connection</button>
+      <button type="button" id="btn-scripts">Scripts</button>
+    </div>
+  </aside>
+  <main class="center">
+    <div class="topic"><div class="tt" id="topic"></div><button class="users-btn" id="users-btn" type="button">Users</button></div>
+    <div class="log" id="log" role="log" aria-live="off" tabindex="0"></div>
+    <form class="inputbar" id="inputbar" autocomplete="off">
+      <span class="pr" id="prompt"></span>
+      <input id="input" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Message or command" placeholder="Type a message, or /help">
+      <button type="submit">Send</button>
+    </form>
+  </main>
+  <aside class="nicks" id="nicks" aria-label="People in this channel"></aside>
+</div>
+
+<dialog class="scripts" id="sdlg" aria-labelledby="sd-title">
+  <div class="sd-head">
+    <h2 id="sd-title">Scripts</h2>
+    <select id="sd-sel" aria-label="Choose script"></select>
+    <input id="sd-name" type="text" spellcheck="false" aria-label="Script name" maxlength="40">
+    <button type="button" id="sd-new">New</button>
+    <button type="button" id="sd-del">Delete</button>
+    <button type="button" id="sd-ex">Insert example</button>
+  </div>
+  <p class="sd-warn">Scripts run as code in this page. They can read everything you type and send, including a password you entered. Only run scripts you wrote or fully understand.</p>
+  <textarea class="sd-code" id="sd-code" spellcheck="false" aria-label="Script code"></textarea>
+  <div class="sd-foot">
+    <span class="msg" id="sd-msg" role="status"></span>
+    <button type="button" id="sd-close">Close</button>
+    <button type="button" class="primary" id="sd-save">Save and run</button>
+  </div>
+</dialog>
+
+<noscript><p style="padding:24px">Zirc needs JavaScript to run.</p></noscript>
 
 <script>
+'use strict';
 (function () {
-  var $ = function (id) { return document.getElementById(id); };
-  var log = $('t-log'), typed = $('t-typed'), nicks = $('t-nicks');
-  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var run = 0;
 
-  var cy = function (s) { return '<span class="c-cy">' + s + '</span>'; };
-  var or = function (s) { return '<span class="c-or">' + s + '</span>'; };
-  var gr = function (s) { return '<span class="c-gr">' + s + '</span>'; };
-  var rd = function (s) { return '<span class="c-rd b">' + s + '</span>'; };
-  var pu = function (s) { return '<span class="c-pu">' + s + '</span>'; };
-  var dim = function (s) { return '<span class="c-dim">' + s + '</span>'; };
-  var ts = function (t) { return '<span class="ts">[' + t + ']</span> '; };
+/* ================================================================ helpers */
+var $ = function (id) { return document.getElementById(id); };
+var VERSION = '0.2-web';
+var LS = {
+  get: function (k, d) { try { var v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } }
+};
+var two = function (n) { return String(n).padStart(2, '0'); };
+var take = function (s) { s = String(s).trim(); var i = s.search(/\s/); return i < 0 ? [s, ''] : [s.slice(0, i), s.slice(i).trim()]; };
+var escapeRe = function (s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); };
+var wildRe = function (p) { return new RegExp('^' + p.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 'i'); };
+var CASE = { '[': '{', ']': '}', '\\': '|', '~': '^' };
+var lc = function (s) { return String(s).toLowerCase().replace(/[\[\]\\~]/g, function (c) { return CASE[c]; }); };
+var utf8len = function (s) { return new TextEncoder().encode(s).length; };
+var GREY = '\x0314', RED = '\x0304', GREEN = '\x0303', PURPLE = '\x0306', RESET = '\x0f';
 
-  var NICKS = '<div class="c-dim">4 users</div><div><span class="c-gr">@</span>' + gr('me') + '</div><div><span class="c-yl">+</span>' + cy('bob') + '</div><div>' + or('alice') + '</div><div>' + pu('carol') + '</div>';
+/* ================================================================ mIRC formatting -> DOM */
+// Colours 0-15 as mIRC defines them. On the dark chat surface the defaults for black and
+// dark blue would vanish, so text without an explicit background uses a readable variant.
+var MIRC = ['#ffffff', '#000000', '#00007f', '#009300', '#ff0000', '#7f0000', '#9c009c', '#fc7f00', '#ffff00', '#00fc00', '#009393', '#00ffff', '#0000fc', '#ff00ff', '#7f7f7f', '#d2d2d2'];
+var READABLE = ['#ffffff', '#9aa0b0', '#8c97ff', '#4cc971', '#ff6b6b', '#d9776f', '#d98bff', '#ffa94d', '#ffe066', '#69f0ae', '#3dd6c6', '#7ee8ff', '#7fa8ff', '#ff8cf0', '#9aa0b0', '#e4e7ee'];
+var NICKC = ['#4cc9d6', '#f4a259', '#5fd38d', '#c792ea', '#ff8fa3', '#f2d45c', '#82aaff', '#7ee0b5', '#ffb86b', '#b4a0ff'];
+function nickIdx(n) { var h = 0; for (var i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0; return h % NICKC.length; }
+// Colour a nick in the mIRC-code mini language (colour numbers map into READABLE).
+var NICK_CODES = [11, 7, 9, 6, 13, 8, 12, 10, 7, 2];
+var cnick = function (n) { return '\x03' + two(NICK_CODES[nickIdx(n)]) + n + RESET; };
 
-  // Each step: wait ms, then add a line, or type text into the input and send it.
-  var steps = [
-    { w: 500,  line: ts('10:41') + '<span class="c-gr">--&gt;</span> You have joined #zirc-test' },
-    { w: 400,  line: ts('10:41') + dim('*** Topic for #zirc-test:') + ' The test topic' },
-    { w: 900,  line: ts('10:41') + '&lt;<span class="c-yl">+</span>' + cy('bob') + '&gt; anyone got a dice bot?' },
-    { w: 800,  line: ts('10:41') + pu('*') + ' ' + or('alice') + ' rolls a die and squints at it' },
-    { w: 1000, line: ts('10:42') + '&lt;<span class="c-yl">+</span>' + cy('bob') + '&gt; !roll 20' },
-    { w: 350,  line: ts('10:42') + '&lt;<span class="c-gr">@</span>' + gr('me') + '&gt; bob rolled 17 (d20)' },
-    { w: 1100, type: '/shout ship it' },
-    { w: 150,  line: ts('10:42') + '&lt;<span class="c-gr">@</span>' + gr('me') + '&gt; ' + rd('SHIP IT!') },
-    { w: 900,  line: ts('10:42') + '&lt;' + pu('carol') + '&gt; nice, that was a script?' },
-    { w: 900,  type: 'yep, twelve lines of JavaScript' },
-    { w: 150,  line: ts('10:43') + '&lt;<span class="c-gr">@</span>' + gr('me') + '&gt; yep, twelve lines of JavaScript' }
-  ];
-
-  function add(html) {
-    var d = document.createElement('div');
-    d.innerHTML = html;
-    log.appendChild(d);
-    while (log.children.length > 40) log.removeChild(log.firstChild);
+var URL_RE = /\bhttps?:\/\/[^\s<>"']+/gi;
+function linkify(parent, text) {
+  var last = 0, m;
+  URL_RE.lastIndex = 0;
+  while ((m = URL_RE.exec(text))) {
+    var url = m[0], trail = '';
+    var t = /[.,;:!?)\]}'"]+$/.exec(url);
+    if (t) { trail = t[0]; url = url.slice(0, -trail.length); }
+    var ok = false;
+    try { var u = new URL(url); ok = (u.protocol === 'http:' || u.protocol === 'https:'); } catch (e) { ok = false; }
+    if (!ok || !url) continue;
+    if (m.index > last) parent.appendChild(document.createTextNode(text.slice(last, m.index)));
+    var a = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = url;
+    parent.appendChild(a);
+    last = m.index + url.length;
+    URL_RE.lastIndex = last;
   }
-  var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  if (last < text.length) parent.appendChild(document.createTextNode(text.slice(last)));
+}
 
-  async function play() {
-    var id = ++run;
-    log.innerHTML = '';
-    typed.textContent = '';
-    nicks.innerHTML = NICKS;
-    for (var i = 0; i < steps.length; i++) {
-      var s = steps[i];
-      if (reduce) {
-        if (s.line) add(s.line);
-        continue;
+function renderIrc(text) {
+  var frag = document.createDocumentFragment();
+  var st = { b: 0, i: 0, u: 0, r: 0, s: 0, fg: null, bg: null };
+  var buf = '';
+  function flush() {
+    if (!buf) return;
+    var plain = !(st.b || st.i || st.u || st.r || st.s || st.fg !== null || st.bg !== null);
+    if (plain) { linkify(frag, buf); buf = ''; return; }
+    var span = document.createElement('span');
+    var cls = [];
+    if (st.b) cls.push('b'); if (st.i) cls.push('i'); if (st.u) cls.push('u'); if (st.s) cls.push('s');
+    if (cls.length) span.className = cls.join(' ');
+    var fg = null, bg = null;
+    var hasBg = st.bg !== null;
+    if (st.fg !== null) fg = typeof st.fg === 'string' ? st.fg : (hasBg ? MIRC[st.fg] : READABLE[st.fg]);
+    if (hasBg) bg = typeof st.bg === 'string' ? st.bg : MIRC[st.bg];
+    if (st.r) { var f2 = bg || '#12141a', b2 = fg || '#d8dbe3'; fg = f2; bg = b2; }
+    if (fg) span.style.color = fg;
+    if (bg) span.style.backgroundColor = bg;
+    linkify(span, buf);
+    frag.appendChild(span);
+    buf = '';
+  }
+  var chars = Array.from(String(text));
+  for (var n = 0; n < chars.length; n++) {
+    var ch = chars[n], cp = ch.codePointAt(0), m;
+    if (ch === '\x02') { flush(); st.b ^= 1; continue; }
+    if (ch === '\x1d') { flush(); st.i ^= 1; continue; }
+    if (ch === '\x1f') { flush(); st.u ^= 1; continue; }
+    if (ch === '\x16') { flush(); st.r ^= 1; continue; }
+    if (ch === '\x1e') { flush(); st.s ^= 1; continue; }
+    if (ch === '\x0f') { flush(); st = { b: 0, i: 0, u: 0, r: 0, s: 0, fg: null, bg: null }; continue; }
+    if (ch === '\x03') {
+      flush();
+      m = /^(\d{1,2})(?:,(\d{1,2}))?/.exec(chars.slice(n + 1, n + 6).join(''));
+      if (!m) { st.fg = null; st.bg = null; continue; }
+      n += m[0].length;
+      st.fg = +m[1] === 99 ? null : +m[1];
+      if (m[2] !== undefined) st.bg = +m[2] === 99 ? null : +m[2];
+      if (typeof st.fg === 'number' && st.fg > 15) st.fg = null;
+      if (typeof st.bg === 'number' && st.bg > 15) st.bg = null;
+      continue;
+    }
+    if (ch === '\x04') {
+      flush();
+      m = /^([0-9a-fA-F]{6})(?:,([0-9a-fA-F]{6}))?/.exec(chars.slice(n + 1, n + 14).join(''));
+      if (!m) continue;
+      n += m[0].length;
+      st.fg = '#' + m[1];
+      if (m[2]) st.bg = '#' + m[2];
+      continue;
+    }
+    if (ch === '\t') { buf += ' '; continue; }
+    if (cp < 32 || (cp >= 0x7f && cp < 0xa0)) continue;
+    buf += ch;
+  }
+  flush();
+  return frag;
+}
+var stripIrc = function (t) { return String(t).replace(/\x03(\d{1,2}(,\d{1,2})?)?|\x04([0-9a-fA-F]{6}(,[0-9a-fA-F]{6})?)?|[\x00-\x08\x0b-\x1f\x7f]/g, ''); };
+var ircfmt = {
+  bold: function (s) { return '\x02' + s + '\x02'; }, italic: function (s) { return '\x1d' + s + '\x1d'; },
+  underline: function (s) { return '\x1f' + s + '\x1f'; }, reverse: function (s) { return '\x16' + s + '\x16'; }, reset: '\x0f',
+  color: function (fg, s, bg) { return '\x03' + String(fg).padStart(2, '0') + (bg != null ? ',' + String(bg).padStart(2, '0') : '') + s + '\x03'; },
+  strip: stripIrc
+};
+
+/* ================================================================ IRC protocol */
+var TAGESC = { ':': ';', s: ' ', '\\': '\\', r: '\r', n: '\n' };
+function parsePrefix(p) {
+  if (!p) return { nick: '', user: '', host: '', server: true };
+  var m = /^([^!@]*)(?:!([^@]*))?(?:@(.*))?$/.exec(p);
+  return { nick: m[1], user: m[2] || '', host: m[3] || '', server: !m[2] && !m[3] && p.indexOf('.') >= 0 };
+}
+function parseLine(line) {
+  var msg = { raw: line, tags: {}, prefix: null, command: '', params: [] };
+  var rest = line, i;
+  if (rest[0] === '@') {
+    i = rest.indexOf(' ');
+    if (i < 0) return msg;
+    rest.slice(1, i).split(';').forEach(function (t) {
+      if (!t) return;
+      var eq = t.indexOf('=');
+      if (eq < 0) msg.tags[t] = true;
+      else msg.tags[t.slice(0, eq)] = t.slice(eq + 1).replace(/\\(.?)/g, function (_, c) { return c in TAGESC ? TAGESC[c] : c; });
+    });
+    rest = rest.slice(i + 1).replace(/^ +/, '');
+  }
+  if (rest[0] === ':') {
+    i = rest.indexOf(' ');
+    msg.prefix = i < 0 ? rest.slice(1) : rest.slice(1, i);
+    rest = i < 0 ? '' : rest.slice(i + 1).replace(/^ +/, '');
+  }
+  var sp = rest.indexOf(' ');
+  msg.command = (sp < 0 ? rest : rest.slice(0, sp)).toUpperCase();
+  rest = sp < 0 ? '' : rest.slice(sp + 1);
+  while (rest.length) {
+    rest = rest.replace(/^ +/, '');
+    if (!rest.length) break;
+    if (rest[0] === ':') { msg.params.push(rest.slice(1)); break; }
+    i = rest.indexOf(' ');
+    if (i < 0) { msg.params.push(rest); break; }
+    msg.params.push(rest.slice(0, i));
+    rest = rest.slice(i + 1);
+  }
+  return msg;
+}
+function formatLine(cmd) {
+  var params = Array.prototype.slice.call(arguments, 1).filter(function (p) { return p !== undefined && p !== null; })
+    .map(function (p) { return String(p).replace(/[\r\n\0]+/g, ' '); });
+  var out = cmd;
+  params.forEach(function (p, i) {
+    var last = i === params.length - 1;
+    if (!last) p = p.replace(/\s/g, '');
+    out += ' ' + (last && (p === '' || p.indexOf(' ') >= 0 || p[0] === ':') ? ':' + p : p);
+  });
+  return out;
+}
+function splitMessage(text, max) {
+  var out = [], rest = text;
+  while (utf8len(rest) > max) {
+    var bytes = 0, i = 0, chars = Array.from(rest);
+    for (var k = 0; k < chars.length; k++) {
+      var b = utf8len(chars[k]);
+      if (bytes + b > max) break;
+      bytes += b; i += chars[k].length;
+    }
+    var cut = i, sp = rest.lastIndexOf(' ', i);
+    if (sp > i * 0.6) cut = sp;
+    out.push(rest.slice(0, cut));
+    rest = rest.slice(cut).replace(/^ /, '');
+  }
+  out.push(rest);
+  return out;
+}
+
+function Emitter() { this._h = {}; }
+Emitter.prototype.on = function (e, f) { (this._h[e] || (this._h[e] = [])).push(f); };
+Emitter.prototype.emit = function (e, d) {
+  (this._h[e] || []).forEach(function (f) { try { f(d); } catch (err) { console.error(err); } });
+};
+
+var DEFAULT_CAPS = ['server-time', 'multi-prefix', 'extended-join', 'userhost-in-names', 'chghost', 'account-notify', 'sasl'];
+
+function Conn(opts) {
+  Emitter.call(this);
+  this.o = Object.assign({ url: '', nick: 'zirc', user: 'zirc', realname: 'Zirc web client', password: null, sasl: null,
+    reconnect: true, reconnectBase: 2000, reconnectMax: 60000, floodBurst: 5, floodRate: 1000 }, opts);
+  this.nick = this.o.nick; this.ws = null; this.registered = false; this.quitting = false;
+  this.channels = new Map(); this.hosts = new Map(); this.caps = new Set(); this.lag = null; this.network = null;
+  this.attempts = 0; this.everReg = false; this.rejoin = []; this.keys = new Map(); this.noProto = false; this.names = new Map();
+  this.queue = []; this.tokens = this.o.floodBurst; this.tokT = Date.now(); this.ctcpTimes = [];
+  this.resetIsupport();
+}
+Conn.prototype = Object.create(Emitter.prototype);
+Object.assign(Conn.prototype, {
+  resetIsupport: function () { this.isupport = new Map(); this.prefixModes = 'ov'; this.prefixSyms = '@+'; this.chantypes = '#&'; this.chanmodes = ['beI', 'k', 'l', 'imnpst']; },
+  chanName: function (t) { var s = String(t); while (s && this.prefixSyms.indexOf(s[0]) >= 0) s = s.slice(1); return s; },
+  isChannel: function (t) { var s = this.chanName(t || ''); return !!s && this.chantypes.indexOf(s[0]) >= 0; },
+  userPrefix: function (chan, nick) {
+    var ch = this.channels.get(lc(chan)), u = ch && ch.users.get(lc(nick));
+    if (!u) return '';
+    for (var i = 0; i < this.prefixModes.length; i++) if (u.modes.indexOf(this.prefixModes[i]) >= 0) return this.prefixSyms[i] || '';
+    return '';
+  },
+  userHost: function (n) { return this.hosts.get(lc(n)) || null; },
+
+  connect: function () {
+    var self = this, o = this.o;
+    this.kill(); this.quitting = false; clearTimeout(this.rt);
+    this.registered = false; this.capAvail = new Map(); this.capPending = new Set(); this.capEnded = false; this.saslBusy = false;
+    this.closeReason = null; this.queue = []; this.tokens = o.floodBurst; this.tokT = Date.now();
+    this.wantedNick = o.nick; this.nick = o.nick; this.caps = new Set(); this.resetIsupport(); this.opened = false;
+    this.emit('connecting', { url: o.url });
+    var ws;
+    try { ws = this.noProto ? new WebSocket(o.url) : new WebSocket(o.url, ['text.ircv3.net']); }
+    catch (e) { this.emit('socketerror', { message: e.message }); this.emit('disconnected', { reason: e.message, quit: true }); return; }
+    ws.binaryType = 'arraybuffer';
+    this.ws = ws;
+    ws.onopen = function () { if (ws === self.ws) { self.opened = true; self.onOpen(); } };
+    ws.onmessage = function (ev) { if (ws === self.ws) self.onData(ev.data); };
+    ws.onerror = function () { if (ws === self.ws && !self.opened) self.closeReason = 'Could not connect'; };
+    ws.onclose = function (ev) { self.onClose(ws, ev); };
+  },
+  kill: function () {
+    clearInterval(this.tick); clearTimeout(this.pt);
+    if (this.ws) { var w = this.ws; this.ws = null; w.onclose = w.onmessage = w.onerror = w.onopen = null; try { w.close(); } catch (e) { /* already closed */ } }
+  },
+  onOpen: function () {
+    var self = this;
+    this.lastData = Date.now(); this.lastLag = Date.now();
+    this.tick = setInterval(function () {
+      var now = Date.now();
+      if (now - self.lastData > 270000) { self.closeReason = 'Ping timeout'; if (self.ws) self.ws.close(); return; }
+      if (self.registered && now - self.lastLag > 60000) { self.lastLag = now; self.sendNow('PING', 'zirc-lag-' + now); }
+    }, 15000);
+    this.emit('connected', {});
+    if (this.o.password) this.sendNow('PASS', this.o.password);
+    this.sendNow('CAP', 'LS', '302');
+    this.sendNow('NICK', this.nick);
+    this.sendNow('USER', this.o.user, '0', '*', this.o.realname);
+  },
+  onData: function (d) {
+    this.lastData = Date.now();
+    var text = typeof d === 'string' ? d : new TextDecoder().decode(d);
+    var lines = text.split(/\r?\n/);
+    for (var i = 0; i < lines.length; i++) {
+      if (!lines[i]) continue;
+      try { this.handle(parseLine(lines[i])); } catch (e) { this.emit('internalerror', e); }
+    }
+  },
+  onClose: function (ws, ev) {
+    if (ws !== this.ws) return;
+    clearInterval(this.tick); clearTimeout(this.pt);
+    this.ws = null;
+    if (!this.opened && !this.quitting) {
+      if (!this.noProto) { this.noProto = true; this.emit('note', 'Retrying without a WebSocket subprotocol'); this.connect(); return; }
+      this.noProto = false;
+    }
+    var was = this.registered;
+    this.registered = false;
+    if (was) this.rejoin = Array.from(this.channels.values()).map(function (c) { return c.name; });
+    this.channels.clear();
+    var reason = this.closeReason || (ev && ev.reason) || (this.opened ? 'Connection closed' : 'Could not connect');
+    this.emit('disconnected', { reason: reason, quit: this.quitting });
+    if (!this.quitting && this.o.reconnect) {
+      var delay = Math.min(this.o.reconnectMax, this.o.reconnectBase * Math.pow(2, this.attempts++));
+      this.emit('reconnecting', { delay: delay, attempt: this.attempts });
+      var self = this;
+      this.rt = setTimeout(function () { self.connect(); }, delay);
+    }
+  },
+  disconnect: function (msg) {
+    this.quitting = true; clearTimeout(this.rt);
+    var ws = this.ws;
+    if (!ws) { this.emit('disconnected', { reason: 'Disconnected', quit: true }); return; }
+    if (this.registered && ws.readyState === 1) this.sendNow('QUIT', msg || 'Zirc');
+    var self = this;
+    this.closeReason = 'Disconnected';
+    try { ws.close(1000); } catch (e) { /* ignore */ }
+    setTimeout(function () { if (self.ws === ws) self.onClose(ws, null); }, 1500);
+  },
+
+  write: function (line) {
+    var ws = this.ws;
+    if (!ws || ws.readyState !== 1) return false;
+    ws.send(line);
+    return true;
+  },
+  sendNow: function () { return this.write(formatLine.apply(null, arguments)); },
+  send: function () { return this.raw(formatLine.apply(null, arguments)); },
+  raw: function (line) {
+    line = String(line).replace(/[\r\n\0]+/g, ' ').slice(0, 510);
+    if (!line.trim() || !this.ws) return false;
+    this.queue.push(line);
+    this.pump();
+    return true;
+  },
+  pump: function () {
+    if (this.pumping) return;
+    var self = this;
+    var step = function () {
+      self.pumping = false;
+      var now = Date.now();
+      self.tokens = Math.min(self.o.floodBurst, self.tokens + (now - self.tokT) / self.o.floodRate);
+      self.tokT = now;
+      while (self.queue.length && self.tokens >= 1) { self.tokens -= 1; self.write(self.queue.shift()); }
+      if (self.queue.length) { self.pumping = true; self.pt = setTimeout(step, Math.ceil((1 - self.tokens) * self.o.floodRate)); }
+    };
+    step();
+  },
+  chunks: function (target, text, reserve) {
+    var budget = Math.max(100, 500 - 70 - utf8len(this.nick) - utf8len(target) - 12 - (reserve || 0)), out = [];
+    String(text).split(/\r?\n/).forEach(function (l) { if (l.length) out.push.apply(out, splitMessage(l, budget)); });
+    return out;
+  },
+  say: function (t, text, cmd) { var s = this.chunks(t, text, 0), self = this; s.forEach(function (c) { self.send(cmd || 'PRIVMSG', t, c); }); return s; },
+  notice: function (t, text) { return this.say(t, text, 'NOTICE'); },
+  action: function (t, text) { var s = this.chunks(t, text, 10), self = this; s.forEach(function (c) { self.send('PRIVMSG', t, '\x01ACTION ' + c + '\x01'); }); return s; },
+  ctcp: function (t, c, a) { this.send('PRIVMSG', t, '\x01' + c + (a ? ' ' + a : '') + '\x01'); },
+  ctcpReply: function (t, c, a) { this.send('NOTICE', t, '\x01' + c + (a ? ' ' + a : '') + '\x01'); },
+  join: function (chans, key) { if (key && chans.indexOf(',') < 0) this.keys.set(lc(chans), key); this.send('JOIN', chans, key); },
+  part: function (c, r) { this.send('PART', c, r); },
+
+  isSelf: function (n) { return lc(n) === lc(this.nick); },
+  touch: function (ch) { ch.ver++; },
+  rememberHost: function (w) { if (w.user && w.host) this.hosts.set(lc(w.nick), w.user + '@' + w.host); },
+
+  handle: function (msg) {
+    this.emit('raw', msg);
+    var p = msg.params, who = parsePrefix(msg.prefix), cmd = msg.command, self = this;
+    var tm = msg.tags.time ? new Date(msg.tags.time) : null;
+    var time = tm && !isNaN(tm) ? tm : new Date();
+    if (/^\d{3}$/.test(cmd)) return this.numeric(msg, cmd, p);
+    var ch;
+    switch (cmd) {
+      case 'PING': this.sendNow('PONG', p[0] || ''); return;
+      case 'PONG': { var m = /^zirc-lag-(\d+)$/.exec(p[p.length - 1] || ''); if (m) { this.lag = (Date.now() - +m[1]) / 1000; this.emit('lag', this.lag); } return; }
+      case 'CAP': return this.cap(msg);
+      case 'AUTHENTICATE': {
+        if (p[0] !== '+' || !this.o.sasl) return;
+        var u = this.o.sasl.user || this.o.nick;
+        var bytes = new TextEncoder().encode(u + '\0' + u + '\0' + this.o.sasl.pass), bin = '';
+        for (var k = 0; k < bytes.length; k++) bin += String.fromCharCode(bytes[k]);
+        var b64 = btoa(bin);
+        for (var i = 0; i < b64.length; i += 400) this.sendNow('AUTHENTICATE', b64.slice(i, i + 400));
+        if (b64.length % 400 === 0) this.sendNow('AUTHENTICATE', '+');
+        return;
       }
-      await sleep(s.w);
-      if (id !== run) return;
-      if (s.type) {
-        for (var k = 1; k <= s.type.length; k++) {
-          typed.textContent = s.type.slice(0, k);
-          await sleep(38 + Math.random() * 40);
-          if (id !== run) return;
+      case 'JOIN': {
+        var chan = p[0], me = this.isSelf(who.nick);
+        this.rememberHost(who);
+        if (me) this.channels.set(lc(chan), { name: chan, users: new Map(), topic: '', ver: 0 });
+        else { ch = this.channels.get(lc(chan)); if (ch) { ch.users.set(lc(who.nick), { nick: who.nick, modes: '' }); this.touch(ch); } }
+        this.emit('join', { who: who, channel: chan, self: me, account: p[1] && p[1] !== '*' ? p[1] : null, time: time });
+        return;
+      }
+      case 'PART': {
+        ch = this.channels.get(lc(p[0]));
+        var meP = this.isSelf(who.nick);
+        if (meP) this.channels.delete(lc(p[0])); else if (ch) { ch.users.delete(lc(who.nick)); this.touch(ch); }
+        this.emit('part', { who: who, channel: p[0], reason: p[1] || '', self: meP, time: time });
+        return;
+      }
+      case 'KICK': {
+        ch = this.channels.get(lc(p[0]));
+        var meK = this.isSelf(p[1]);
+        if (meK) this.channels.delete(lc(p[0])); else if (ch) { ch.users.delete(lc(p[1])); this.touch(ch); }
+        this.emit('kick', { who: who, channel: p[0], victim: p[1], reason: p[2] || '', self: meK, time: time });
+        return;
+      }
+      case 'QUIT': {
+        var chans = [];
+        this.channels.forEach(function (c) { if (c.users.delete(lc(who.nick))) { self.touch(c); chans.push(c.name); } });
+        this.hosts.delete(lc(who.nick));
+        this.emit('quit', { who: who, reason: p[0] || '', channels: chans, time: time });
+        return;
+      }
+      case 'NICK': {
+        var nn = p[0], meN = this.isSelf(who.nick), cl = [];
+        this.channels.forEach(function (c) {
+          var us = c.users.get(lc(who.nick));
+          if (us) { c.users.delete(lc(who.nick)); us.nick = nn; c.users.set(lc(nn), us); self.touch(c); cl.push(c.name); }
+        });
+        var h = this.hosts.get(lc(who.nick));
+        if (h) { this.hosts.delete(lc(who.nick)); this.hosts.set(lc(nn), h); }
+        if (meN) this.nick = nn;
+        this.emit('nick', { who: who, newNick: nn, self: meN, channels: cl, time: time });
+        return;
+      }
+      case 'CHGHOST': this.hosts.set(lc(who.nick), p[0] + '@' + p[1]); return;
+      case 'TOPIC': ch = this.channels.get(lc(p[0])); if (ch) ch.topic = p[1] || ''; this.emit('topic', { who: who, channel: p[0], topic: p[1] || '', time: time }); return;
+      case 'INVITE': this.emit('invite', { who: who, channel: p[1], time: time }); return;
+      case 'MODE': {
+        if (this.isChannel(p[0])) {
+          ch = this.channels.get(lc(p[0]));
+          var changes = this.applyModes(ch, p[1] || '', p.slice(2));
+          this.emit('mode', { who: who, target: p[0], modestr: p.slice(1).join(' '), changes: changes, time: time });
+        } else this.emit('usermode', { who: who, target: p[0], modestr: p.slice(1).join(' ') });
+        return;
+      }
+      case 'PRIVMSG': case 'NOTICE': return this.message(msg, who, time);
+      case 'ERROR': this.emit('servererror', { message: p[0] || '' }); this.closeReason = p[0] || null; return;
+      default:
+    }
+  },
+  message: function (msg, who, time) {
+    var target = msg.params[0], text = msg.params[1] || '';
+    if (target === undefined) return;
+    var isNotice = msg.command === 'NOTICE';
+    var base = { from: who, target: target, isChannel: this.isChannel(target), self: this.isSelf(who.nick), time: time, tags: msg.tags };
+    this.rememberHost(who);
+    var c = /^\x01([^\x01 ]*) ?([^\x01]*)\x01?$/.exec(text);
+    if (c) {
+      var command = c[1].toUpperCase(), args = c[2];
+      if (isNotice) { this.emit('ctcpreply', Object.assign({ command: command, args: args }, base)); return; }
+      if (command === 'ACTION') { this.emit('message', Object.assign({ type: 'action', text: args }, base)); return; }
+      this.emit('ctcp', Object.assign({ command: command, args: args }, base));
+      if (!base.isChannel) this.autoCtcp(who.nick, command, args);
+      return;
+    }
+    this.emit('message', Object.assign({ type: isNotice ? 'notice' : 'privmsg', text: text }, base));
+  },
+  autoCtcp: function (nick, command, args) {
+    var now = Date.now();
+    this.ctcpTimes = this.ctcpTimes.filter(function (t) { return now - t < 10000; });
+    if (this.ctcpTimes.length >= 5) return;
+    this.ctcpTimes.push(now);
+    if (command === 'VERSION') this.ctcpReply(nick, 'VERSION', 'Zirc ' + VERSION + ' (web)');
+    else if (command === 'PING') this.ctcpReply(nick, 'PING', args.slice(0, 64));
+    else if (command === 'TIME') this.ctcpReply(nick, 'TIME', new Date().toString());
+    else if (command === 'CLIENTINFO') this.ctcpReply(nick, 'CLIENTINFO', 'ACTION CLIENTINFO PING TIME VERSION');
+  },
+  applyModes: function (ch, modestr, args) {
+    var A = this.chanmodes[0], B = this.chanmodes[1], C = this.chanmodes[2], changes = [], add = true, ai = 0, self = this;
+    Array.from(modestr).forEach(function (m) {
+      if (m === '+') add = true;
+      else if (m === '-') add = false;
+      else if (self.prefixModes.indexOf(m) >= 0) {
+        var arg = args[ai++];
+        changes.push({ add: add, mode: m, arg: arg });
+        var u = ch && arg && ch.users.get(lc(arg));
+        if (u) {
+          var set = new Set(u.modes.split(''));
+          if (add) set.add(m); else set.delete(m);
+          u.modes = self.prefixModes.split('').filter(function (x) { return set.has(x); }).join('');
+          self.touch(ch);
         }
-        await sleep(280);
-        if (id !== run) return;
-        typed.textContent = '';
-      } else {
-        add(s.line);
+      } else if (A.indexOf(m) >= 0 || B.indexOf(m) >= 0 || (C.indexOf(m) >= 0 && add)) changes.push({ add: add, mode: m, arg: args[ai++] });
+      else changes.push({ add: add, mode: m });
+    });
+    return changes;
+  },
+  cap: function (msg) {
+    var p = msg.params, sub = (p[1] || '').toUpperCase(), self = this;
+    var list = (p[p.length - 1] || '').split(' ').filter(Boolean);
+    if (sub === 'LS') {
+      list.forEach(function (tok) { var i = tok.indexOf('='); self.capAvail.set(i < 0 ? tok : tok.slice(0, i), i < 0 ? '' : tok.slice(i + 1)); });
+      if (p[2] === '*') return;
+      var want = DEFAULT_CAPS.filter(function (c) {
+        if (!self.capAvail.has(c)) return false;
+        if (c !== 'sasl') return true;
+        var v = self.capAvail.get('sasl');
+        return !!self.o.sasl && (!v || v.toUpperCase().split(',').indexOf('PLAIN') >= 0);
+      });
+      want.forEach(function (c) { self.capPending.add(c); self.sendNow('CAP', 'REQ', c); });
+      this.maybeEnd();
+    } else if (sub === 'ACK') {
+      list.forEach(function (c) {
+        var name = c.replace(/^[-~=]+/, '');
+        if (c[0] === '-') self.caps.delete(name); else self.caps.add(name);
+        self.capPending.delete(name);
+        if (name === 'sasl' && c[0] !== '-' && self.o.sasl) { self.saslBusy = true; self.sendNow('AUTHENTICATE', 'PLAIN'); }
+      });
+      this.maybeEnd();
+    } else if (sub === 'NAK') { list.forEach(function (c) { self.capPending.delete(c); }); this.maybeEnd(); }
+    else if (sub === 'DEL') list.forEach(function (c) { self.caps.delete(c); });
+  },
+  maybeEnd: function () {
+    if (this.capEnded || this.registered || this.capPending.size || this.saslBusy) return;
+    this.capEnded = true;
+    this.sendNow('CAP', 'END');
+  },
+  numeric: function (msg, cmd, p) {
+    var self = this, ch;
+    switch (cmd) {
+      case '001':
+        this.nick = p[0]; this.registered = true; this.attempts = 0;
+        this.emit('registered', { nick: p[0], message: p[1] || '', reconnect: this.everReg });
+        this.everReg = true;
+        if (this.rejoin.length) { this.rejoin.forEach(function (c) { self.send('JOIN', c, self.keys.get(lc(c))); }); this.rejoin = []; }
+        break;
+      case '005':
+        p.slice(1, -1).forEach(function (tok) {
+          var i = tok.indexOf('='), k = i < 0 ? tok : tok.slice(0, i), v = i < 0 ? '' : tok.slice(i + 1);
+          self.isupport.set(k, v);
+          if (k === 'PREFIX') { var m = /^\((\w*)\)(.*)$/.exec(v); if (m) { self.prefixModes = m[1]; self.prefixSyms = m[2]; } }
+          else if (k === 'CHANTYPES') self.chantypes = v || '#&';
+          else if (k === 'CHANMODES') self.chanmodes = v.split(',').concat(['', '', '', '']).slice(0, 4);
+          else if (k === 'NETWORK') self.network = v;
+        });
+        break;
+      case '332': ch = this.channels.get(lc(p[1])); if (ch) ch.topic = p[2] || ''; this.emit('topic', { who: null, channel: p[1], topic: p[2] || '', initial: true }); break;
+      case '353': {
+        var key = lc(p[2]);
+        if (!this.names.has(key)) this.names.set(key, new Map());
+        var users = this.names.get(key);
+        (p[3] || '').split(' ').filter(Boolean).forEach(function (tok) {
+          var modes = '';
+          while (tok && self.prefixSyms.indexOf(tok[0]) >= 0) { modes += self.prefixModes[self.prefixSyms.indexOf(tok[0])] || ''; tok = tok.slice(1); }
+          var nick = tok, bang = tok.indexOf('!');
+          if (bang > 0) { nick = tok.slice(0, bang); self.hosts.set(lc(nick), tok.slice(bang + 1)); }
+          users.set(lc(nick), { nick: nick, modes: self.prefixModes.split('').filter(function (m) { return modes.indexOf(m) >= 0; }).join('') });
+        });
+        break;
+      }
+      case '366': {
+        var k2 = lc(p[1]), us = this.names.get(k2);
+        this.names.delete(k2);
+        ch = this.channels.get(k2);
+        if (ch && us) { ch.users = us; this.touch(ch); }
+        this.emit('names', { channel: p[1] });
+        break;
+      }
+      case '433': case '432': case '436':
+        if (!this.registered) { this.wantedNick += '_'; this.sendNow('NICK', this.wantedNick); this.nick = this.wantedNick; }
+        break;
+      case '903': this.saslBusy = false; this.emit('sasl', { ok: true }); this.maybeEnd(); break;
+      case '902': case '904': case '905': case '906': case '907':
+        this.saslBusy = false; this.emit('sasl', { ok: false, message: p[p.length - 1] || cmd }); this.maybeEnd(); break;
+      default:
+    }
+    this.emit('numeric', { code: cmd, params: p, prefix: msg.prefix });
+  }
+});
+
+Object.defineProperties(Conn.prototype, {
+  connected: { get: function () { return !!(this.registered && this.ws && this.ws.readyState === 1); } },
+  connecting: { get: function () { return !!(this.ws && !this.registered && this.ws.readyState <= 1); } }
+});
+
+/* ================================================================ script engine */
+function Scripts(host) { this.host = host; this.recs = []; }
+Scripts.prototype = {
+  guard: function (rec, fn, a, b) {
+    try {
+      var r = fn(a, b);
+      if (r && typeof r.then === 'function') r.catch(function (e) { this.host.error(rec.name, e); }.bind(this));
+      return r;
+    } catch (e) { this.host.error(rec.name, e); return undefined; }
+  },
+  emit: function (evt, ev) {
+    evt = evt.toLowerCase();
+    var list = this.recs.slice();
+    for (var i = 0; i < list.length; i++) {
+      var hs = list[i].handlers.slice();
+      for (var j = 0; j < hs.length; j++) {
+        if (hs[j].evt !== evt && hs[j].evt !== '*') continue;
+        if (this.guard(list[i], hs[j].fn, ev) === false) return false;
       }
     }
+    return true;
+  },
+  alias: function (name) {
+    var self = this;
+    for (var i = 0; i < this.recs.length; i++) {
+      var fn = this.recs[i].aliases.get(name.toLowerCase());
+      if (fn) { var rec = this.recs[i]; return function (args, ctx) { return self.guard(rec, fn, args, ctx); }; }
+    }
+    return null;
+  },
+  names: function () { return this.recs.reduce(function (a, r) { return a.concat(Array.from(r.aliases.keys())); }, []); },
+  stopTimers: function (rec) { rec.timers.forEach(function (t) { clearTimeout(t); clearInterval(t); }); rec.timers.clear(); },
+  unloadAll: function () { var self = this; this.recs.forEach(function (r) { self.stopTimers(r); }); this.recs = []; },
+  store: function (rec) {
+    var key = 'zirc.store.' + rec.name;
+    return {
+      get: function (k, d) { var v = LS.get(key, {})[k]; return v === undefined ? d : v; },
+      set: function (k, v) { var o = LS.get(key, {}); o[k] = v; LS.set(key, o); },
+      delete: function (k) { var o = LS.get(key, {}); delete o[k]; LS.set(key, o); },
+      all: function () { return LS.get(key, {}); }
+    };
+  },
+  api: function (rec) {
+    var h = this.host, self = this;
+    var track = function (t) { rec.timers.add(t); return t; };
+    return {
+      version: VERSION, fmt: ircfmt, script: { name: rec.name },
+      on: function (evt, fn) { if (typeof fn !== 'function') throw new TypeError('zirc.on: handler must be a function'); rec.handlers.push({ evt: String(evt).toLowerCase(), fn: fn }); },
+      alias: function (name, fn) { if (typeof fn !== 'function') throw new TypeError('zirc.alias: handler must be a function'); rec.aliases.set(String(name).toLowerCase().replace(/^\//, ''), fn); },
+      after: function (ms, fn) { var t = setTimeout(function () { rec.timers.delete(t); self.guard(rec, fn); }, ms); return track(t); },
+      every: function (ms, fn) { return track(setInterval(function () { self.guard(rec, fn); }, Math.max(100, ms))); },
+      cancel: function (t) { clearTimeout(t); clearInterval(t); rec.timers.delete(t); },
+      echo: function (text, where) { h.echo(String(text), where); },
+      say: function (t, text) { return h.say(t, String(text)); },
+      msg: function (t, text) { return h.say(t, String(text)); },
+      action: function (t, text) { return h.action(t, String(text)); },
+      notice: function (t, text) { return h.notice(t, String(text)); },
+      send: function (raw) { return h.send(String(raw)); },
+      join: function (c) { return h.send('JOIN ' + c); },
+      part: function (c) { return h.send('PART ' + c); },
+      command: function (line) { h.runLine(String(line)); },
+      nick: function () { return h.info().nick; },
+      channels: function () { return h.info().channels; },
+      users: function (c) { return h.info().users(c); },
+      store: this.store(rec)
+    };
+  },
+  load: function (name, code) {
+    var rec = { name: name, handlers: [], aliases: new Map(), timers: new Set() };
+    this.recs.push(rec);
+    try { new Function('zirc', '"use strict";\n' + code)(this.api(rec)); }
+    catch (e) { this.stopTimers(rec); this.recs.splice(this.recs.indexOf(rec), 1); throw e; }
   }
+};
 
-  $('replay').addEventListener('click', play);
-  play();
+var EXAMPLE = [
+  "// Example script. Save and run it, then try !ping in a channel or /shout hello",
+  "zirc.on('text', function (e) {",
+  "  if (/^!ping\\b/i.test(e.text)) e.reply(e.nick + ': pong');",
+  "  if (e.text.indexOf('!roll') === 0) {",
+  "    var sides = parseInt(e.text.split(/\\s+/)[1], 10) || 6;",
+  "    e.reply(e.nick + ' rolled ' + (1 + Math.floor(Math.random() * sides)) + ' (d' + sides + ')');",
+  "  }",
+  "});",
+  "",
+  "zirc.alias('shout', function (args, ctx) {",
+  "  if (!args) return ctx.echo('usage: /shout <text>');",
+  "  ctx.reply(zirc.fmt.bold(zirc.fmt.color(4, args.toUpperCase() + '!')));",
+  "});",
+  "",
+  "zirc.on('join', function (e) {",
+  "  if (!e.self) e.say(e.channel, 'Welcome, ' + e.nick + '!');",
+  "});",
+  ""
+].join('\n');
 
-  var btns = document.querySelectorAll('.copy');
-  Array.prototype.forEach.call(btns, function (b) {
-    b.addEventListener('click', function () {
-      var text = b.getAttribute('data-copy');
-      var done = function () { b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy'; }, 1400); };
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () { b.textContent = 'Press Ctrl+C'; });
-      else b.textContent = 'Select and copy';
-    });
+/* ================================================================ app state */
+var settings = Object.assign({
+  url: 'wss://testnet.ergo.chat/webirc', nick: '', chans: '#zirc-test', sasluser: '', highlights: [], ignore: []
+}, LS.get('zirc.settings', {}));
+if (!settings.nick) settings.nick = 'zirc' + Math.floor(100 + Math.random() * 900);
+var saveSettings = function () { LS.set('zirc.settings', settings); };
+
+var conn = null;
+var wins = [];
+var cur = null;
+var status = null;
+var hist = [], hi = -1, draft = '', tab = null;
+var userJoin = new Map();
+var ignoreRe = [];
+var depth = 0, listCount = 0;
+var saslPass = '';
+var MAX_MEM = 2000, MAX_DOM = 800;
+
+function rebuildIgnore() { ignoreRe = settings.ignore.map(wildRe); }
+rebuildIgnore();
+
+function Win(name, type) { this.name = name; this.type = type; this.lines = []; this.unread = 0; this.hl = 0; this.spoke = new Map(); this.nickKey = ''; }
+Object.defineProperty(Win.prototype, 'chan', { get: function () { return this.type === 'channel' && conn ? conn.channels.get(lc(this.name)) || null : null; } });
+
+function findWin(name) { var l = lc(name); return wins.filter(function (w) { return w.type !== 'status' && lc(w.name) === l; })[0] || null; }
+function openWin(name, type) { var w = findWin(name); if (!w) { w = new Win(name, type); wins.push(w); chromeDirty(); } return w; }
+function removeWin(w) {
+  var i = wins.indexOf(w);
+  if (i < 0 || w.type === 'status') return;
+  wins.splice(i, 1);
+  if (cur === w) switchTo(wins[Math.max(0, i - 1)]);
+  chromeDirty();
+}
+
+/* ================================================================ rendering */
+var logEl = $('log');
+function lineEl(line) {
+  var d = document.createElement('div');
+  d.className = 'line' + (line.hl ? ' hl' : '');
+  var ts = document.createElement('span');
+  ts.className = 'ts';
+  ts.textContent = '[' + two(line.time.getHours()) + ':' + two(line.time.getMinutes()) + '] ';
+  d.appendChild(ts);
+  d.appendChild(renderIrc(line.text));
+  return d;
+}
+function print(win, text, opts) {
+  opts = opts || {};
+  win = win || cur;
+  if (!win) return;
+  var line = { text: text, time: opts.time || new Date(), hl: !!opts.hl };
+  win.lines.push(line);
+  if (win.lines.length > MAX_MEM) win.lines.splice(0, 200);
+  if (win === cur) {
+    var near = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 48;
+    logEl.appendChild(lineEl(line));
+    while (logEl.childNodes.length > MAX_DOM) logEl.removeChild(logEl.firstChild);
+    if (near) logEl.scrollTop = logEl.scrollHeight;
+  } else if (opts.act !== false) {
+    win.unread++;
+    if (opts.hl) win.hl++;
+    chromeDirty();
+  }
+}
+var info = function (win, text) { print(win, GREY + '*** ' + text, { act: false }); };
+
+function switchTo(w) {
+  if (!w) return;
+  cur = w; w.unread = 0; w.hl = 0; tab = null;
+  logEl.textContent = '';
+  var frag = document.createDocumentFragment();
+  w.lines.slice(-MAX_DOM).forEach(function (l) { frag.appendChild(lineEl(l)); });
+  logEl.appendChild(frag);
+  logEl.scrollTop = logEl.scrollHeight;
+  $('app').classList.remove('nicks-open');
+  chromeDirty();
+}
+
+var chromeQueued = false;
+function chromeDirty() { if (chromeQueued) return; chromeQueued = true; requestAnimationFrame(function () { chromeQueued = false; renderChrome(); }); }
+
+function setTopic(win) {
+  var t = $('topic');
+  t.textContent = '';
+  var b = document.createElement('b');
+  if (win.type === 'channel') {
+    b.textContent = win.name;
+    t.appendChild(b);
+    t.appendChild(renderIrc(win.chan ? (win.chan.topic || '(no topic)') : ''));
+  } else if (win.type === 'query') { b.textContent = 'Query with ' + win.name; t.appendChild(b); }
+  else {
+    b.textContent = win.name; t.appendChild(b);
+    t.appendChild(document.createTextNode(conn ? (conn.connected ? 'connected as ' + conn.nick : conn.connecting ? 'connecting...' : 'disconnected') : 'not connected'));
+  }
+}
+
+function renderChrome() {
+  if (!cur) return;
+  // window list
+  var ul = $('wins'), total = 0;
+  ul.textContent = '';
+  wins.forEach(function (w, i) {
+    var li = document.createElement('li');
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'win' + (w.unread ? ' unread' : '');
+    if (w === cur) b.setAttribute('aria-current', 'true');
+    var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = w.name;
+    b.appendChild(nm);
+    if (w.unread && w !== cur) {
+      var bd = document.createElement('span'); bd.className = 'badge' + (w.hl ? ' hl' : ''); bd.textContent = w.hl ? '!' + w.hl : String(w.unread);
+      b.appendChild(bd);
+      total += w.hl;
+    }
+    b.addEventListener('click', function () { switchTo(w); $('input').focus(); });
+    li.appendChild(b); ul.appendChild(li);
   });
+  var act = ul.querySelector('[aria-current="true"]');
+  if (act && act.scrollIntoView) act.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  document.title = (total ? '(' + total + ') ' : '') + 'Zirc: IRC in your browser';
+  setTopic(cur);
+  $('prompt').textContent = '[' + cur.name + ']';
+  var dot = $('dot');
+  dot.className = 'dot' + (conn && conn.connected ? ' on' : conn && conn.connecting ? ' wait' : '');
+  renderNicks();
+}
+
+function renderNicks() {
+  var box = $('nicks'), w = cur, ch = w && w.chan;
+  if (!ch) { if (box.dataset.key !== 'none') { box.textContent = ''; box.dataset.key = 'none'; } return; }
+  var key = w.name + '#' + ch.ver + '#' + conn.nick;
+  if (box.dataset.key === key) return;
+  box.dataset.key = key;
+  box.textContent = '';
+  var users = Array.from(ch.users.values()), modes = conn.prefixModes;
+  var rank = function (u) { var i = modes.split('').findIndex(function (m) { return u.modes.indexOf(m) >= 0; }); return i < 0 ? 99 : i; };
+  users.sort(function (a, b) { return rank(a) - rank(b) || lc(a.nick).localeCompare(lc(b.nick)); });
+  var cnt = document.createElement('div'); cnt.className = 'cnt'; cnt.textContent = users.length + ' users'; box.appendChild(cnt);
+  var cls = { '@': 'pfx-o', '+': 'pfx-v', '%': 'pfx-h', '&': 'pfx-a', '~': 'pfx-q' };
+  users.slice(0, 600).forEach(function (u) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'n';
+    var p = conn.userPrefix(w.name, u.nick);
+    if (p) { var sp = document.createElement('span'); sp.className = cls[p] || ''; sp.textContent = p; b.appendChild(sp); }
+    var nn = document.createElement('span'); nn.style.color = NICKC[nickIdx(u.nick)]; nn.textContent = u.nick; b.appendChild(nn);
+    b.addEventListener('click', function () { openWin(u.nick, 'query'); switchTo(findWin(u.nick)); $('input').focus(); });
+    box.appendChild(b);
+  });
+}
+
+/* ================================================================ messaging helpers */
+function isIgnored(from) { var m = from.nick + '!' + from.user + '@' + from.host; return ignoreRe.some(function (r) { return r.test(m); }); }
+function isHighlight(text) {
+  var plain = stripIrc(text).toLowerCase();
+  return [conn.nick].concat(settings.highlights).filter(Boolean).some(function (w) {
+    return new RegExp('(^|[^\\w])' + escapeRe(w.toLowerCase()) + '($|[^\\w])').test(plain);
+  });
+}
+function sayTo(target, text, action) {
+  if (!conn || !conn.connected || !target) return false;
+  var sent = action ? conn.action(target, text) : conn.say(target, text);
+  var win = findWin(conn.chanName(target));
+  sent.forEach(function (chunk) {
+    if (win) {
+      var pfx = win.type === 'channel' ? conn.userPrefix(win.name, conn.nick) : '';
+      print(win, action ? PURPLE + '*' + RESET + ' ' + pfx + cnick(conn.nick) + ' ' + chunk : '<' + pfx + cnick(conn.nick) + '> ' + chunk, { act: false });
+    } else print(cur, GREY + '->' + RESET + ' ' + (action ? '* ' : '') + '[' + target + '] ' + chunk, { act: false });
+  });
+  return true;
+}
+
+/* ================================================================ scripts host */
+var engine = new Scripts({
+  echo: function (text, where) { print(where ? findWin(where) || cur : cur, text, { act: false }); },
+  error: function (name, err) {
+    var msg = err && err.message ? (err.name || 'Error') + ': ' + err.message : String(err);
+    print(cur || status, RED + '[script ' + name + '] ' + msg, { act: false });
+  },
+  say: function (t, text) { return sayTo(t, text); },
+  action: function (t, text) { return sayTo(t, text, true); },
+  notice: function (t, text) { if (!conn || !conn.connected) return false; conn.notice(t, text); return true; },
+  send: function (raw) { return conn ? conn.raw(raw) : false; },
+  runLine: function (line) { runLine(line, cur); },
+  info: function () {
+    return {
+      nick: conn ? conn.nick : null,
+      channels: conn ? Array.from(conn.channels.values()).map(function (c) { return c.name; }) : [],
+      users: function (c) { var ch = conn && conn.channels.get(lc(c)); return ch ? Array.from(ch.users.values()).map(function (u) { return u.nick; }) : []; }
+    };
+  }
+});
+
+function fire(name, data, win) {
+  var ev = Object.assign({ event: name, server: conn.network || conn.o.url, me: conn.nick }, data);
+  ev.window = win ? win.name : null;
+  ev.reply = function (t) { sayTo(ev.channel || ev.nick, t); };
+  ev.say = function (t, x) { sayTo(t, x); };
+  ev.echo = function (t) { print(win || status, String(t)); };
+  ev.send = function (r) { conn.raw(r); };
+  ev.command = function (l) { runLine(l, win || status); };
+  return engine.emit(name, ev);
+}
+
+function loadScripts(quiet) {
+  engine.unloadAll();
+  var list = LS.get('zirc.scripts', []), errs = [];
+  list.forEach(function (s) {
+    try { engine.load(s.name, s.code); } catch (e) { errs.push({ name: s.name, message: e.message }); }
+  });
+  errs.forEach(function (e) { print(status, RED + '*** Script ' + e.name + ' failed: ' + e.message, { act: false }); });
+  if (!quiet) info(cur || status, 'Loaded ' + (list.length - errs.length) + ' script(s)');
+  return errs;
+}
+
+/* ================================================================ connection wiring */
+function wire(c) {
+  var st = function (t) { print(status, t, { act: false }); };
+  c.on('connecting', function (e) { st(GREY + '*** Connecting to ' + e.url + '...'); chromeDirty(); });
+  c.on('note', function (t) { st(GREY + '*** ' + t); });
+  c.on('connected', function () { st(GREY + '*** Connected. Logging in...'); });
+  c.on('socketerror', function (e) { st(RED + '*** Connection error: ' + e.message); });
+  c.on('disconnected', function (e) {
+    var t = RED + '*** Disconnected (' + e.reason + ')';
+    st(t);
+    wins.forEach(function (w) { if (w.type === 'channel') print(w, t, { act: false }); });
+    fire('disconnect', { reason: e.reason }, status);
+    showConnectError(e.quit ? '' : e.reason);
+    chromeDirty();
+  });
+  c.on('reconnecting', function (e) { st(GREY + '*** Reconnecting in ' + Math.round(e.delay / 1000) + 's (attempt ' + e.attempt + ')...'); });
+  c.on('servererror', function (e) { st(RED + '*** Server error: ' + e.message); });
+  c.on('sasl', function (e) { st(e.ok ? GREEN + '*** Logged in to your account' : RED + '*** Account login failed: ' + e.message); });
+  c.on('lag', function () { chromeDirty(); });
+  c.on('internalerror', function (e) { st(RED + '*** internal error: ' + e.message); });
+  c.on('names', function () { chromeDirty(); });
+  c.on('raw', function (m) { engine.emit('raw', { event: 'raw', line: m.raw, command: m.command, params: m.params, prefix: m.prefix, tags: m.tags }); });
+  c.on('registered', function (e) {
+    if (c.network) status.name = c.network;
+    st(GREEN + '*** Logged in as ' + e.nick + (c.network ? ' on ' + c.network : ''));
+    if (!e.reconnect) {
+      var aj = settings.chans.split(/[\s,]+/).filter(Boolean).map(function (x) { return c.isChannel(x) ? x : '#' + x; });
+      if (aj.length) c.join(aj.join(','));
+    }
+    hideConnect();
+    fire('connect', { reconnect: e.reconnect }, status);
+    chromeDirty();
+  });
+  c.on('message', function (m) { onMessage(m); });
+  c.on('ctcp', function (e) {
+    var w = cur;
+    if (fire('ctcp', { nick: e.from.nick, command: e.command, args: e.args, target: e.target }, w) === false) return;
+    print(w, GREY + '[CTCP ' + e.command + (e.args ? ' ' + e.args : '') + ' from ' + e.from.nick + ']', { act: false });
+  });
+  c.on('ctcpreply', function (e) {
+    var a = e.args;
+    if (e.command === 'PING' && /^\d{9,}$/.test(a)) a = ((Date.now() - +a) / 1000).toFixed(2) + 's';
+    print(cur, GREY + '[' + e.from.nick + ' ' + e.command + ' reply]: ' + a, { act: false });
+  });
+  c.on('join', function (e) {
+    var chan = e.channel;
+    if (e.self) {
+      var w = openWin(chan, 'channel');
+      var t = userJoin.get(lc(chan));
+      var first = cur === status && !wins.some(function (x) { return x.type === 'channel' && x !== w; });
+      if ((t && Date.now() - t < 10000) || first) switchTo(w);
+      fire('join', { nick: e.who.nick, user: e.who.user, host: e.who.host, channel: chan, self: true }, w);
+      print(w, GREEN + '-->' + RESET + ' You have joined ' + chan, { act: false, time: e.time });
+      return;
+    }
+    var win = findWin(chan);
+    if (!win) return;
+    var ok = fire('join', { nick: e.who.nick, user: e.who.user, host: e.who.host, channel: chan, self: false, account: e.account }, win);
+    if (ok) print(win, GREEN + '-->' + RESET + ' ' + cnick(e.who.nick) + ' (' + e.who.user + '@' + e.who.host + ') has joined ' + chan, { act: false, time: e.time });
+  });
+  c.on('part', function (e) {
+    var win = findWin(e.channel);
+    if (!win) return;
+    var ok = fire('part', { nick: e.who.nick, channel: e.channel, reason: e.reason, self: e.self }, win);
+    if (e.self) { removeWin(win); return; }
+    if (ok) print(win, RED + '<--' + RESET + ' ' + cnick(e.who.nick) + ' (' + e.who.user + '@' + e.who.host + ') has left ' + e.channel + (e.reason ? ' (' + e.reason + ')' : ''), { act: false, time: e.time });
+  });
+  c.on('kick', function (e) {
+    var win = findWin(e.channel);
+    if (!win) return;
+    if (!fire('kick', { nick: e.who.nick, victim: e.victim, channel: e.channel, reason: e.reason, self: e.self }, win)) return;
+    print(win, RED + '<--' + RESET + ' ' + (e.self ? 'You were kicked from ' + e.channel + ' by ' + cnick(e.who.nick) : cnick(e.victim) + ' was kicked by ' + cnick(e.who.nick)) + (e.reason ? ' (' + e.reason + ')' : ''), { act: false, time: e.time });
+  });
+  c.on('quit', function (e) {
+    if (!fire('quit', { nick: e.who.nick, reason: e.reason, channels: e.channels }, null)) return;
+    e.channels.forEach(function (ch) {
+      var w = findWin(ch);
+      if (w) print(w, RED + '<--' + RESET + ' ' + cnick(e.who.nick) + ' (' + e.who.user + '@' + e.who.host + ') has quit' + (e.reason ? ' (' + e.reason + ')' : ''), { act: false, time: e.time });
+    });
+    var q = findWin(e.who.nick);
+    if (q && q.type === 'query') print(q, RED + '<--' + RESET + ' ' + cnick(e.who.nick) + ' has quit' + (e.reason ? ' (' + e.reason + ')' : ''), { act: false });
+  });
+  c.on('nick', function (e) {
+    var old = e.who.nick;
+    if (!fire('nick', { nick: old, newNick: e.newNick, self: e.self, channels: e.channels }, null)) return;
+    var text = e.self ? GREY + '*** You are now known as ' + cnick(e.newNick) : GREY + '***' + RESET + ' ' + cnick(old) + ' is now known as ' + cnick(e.newNick);
+    e.channels.forEach(function (ch) { var w = findWin(ch); if (w) print(w, text, { act: false, time: e.time }); });
+    var q = findWin(old);
+    if (q && q.type === 'query' && !findWin(e.newNick)) { q.name = e.newNick; print(q, text, { act: false }); }
+    if (e.self) print(status, text, { act: false });
+    chromeDirty();
+  });
+  c.on('topic', function (e) {
+    var win = findWin(e.channel) || status;
+    if (e.who && fire('topic', { nick: e.who.nick, channel: e.channel, topic: e.topic }, win) === false) return;
+    print(win, e.who ? GREY + '***' + RESET + ' ' + cnick(e.who.nick) + ' changed the topic to: ' + e.topic : GREY + '*** Topic for ' + e.channel + ':' + RESET + ' ' + e.topic, { act: false });
+    chromeDirty();
+  });
+  c.on('mode', function (e) {
+    var win = findWin(e.target) || status;
+    if (fire('mode', { nick: e.who.nick, target: e.target, channel: e.target, modes: e.modestr, changes: e.changes }, win)) print(win, GREY + '*** ' + (e.who.nick || 'server') + ' sets mode: ' + e.modestr, { act: false });
+    chromeDirty();
+  });
+  c.on('usermode', function (e) { st(GREY + '*** Mode ' + e.target + ' ' + e.modestr); });
+  c.on('invite', function (e) {
+    if (fire('invite', { nick: e.who.nick, channel: e.channel }, null) === false) return;
+    print(cur, GREEN + '***' + RESET + ' ' + cnick(e.who.nick) + ' invites you to ' + e.channel + GREY + '  (type /join ' + e.channel + ')', { act: false });
+  });
+  c.on('numeric', function (e) { onNumeric(e); });
+}
+
+function onMessage(m) {
+  var from = m.from;
+  if (!m.self && !from.server && isIgnored(from)) return;
+  var chan = m.isChannel ? conn.chanName(m.target) : null, win;
+  if (chan) win = findWin(chan) || status;
+  else if (m.type === 'notice') win = (from.server || !from.nick) ? status : cur;
+  else win = openWin(from.nick, 'query');
+  var hl = chan ? isHighlight(m.text) : (m.type !== 'notice' && !from.server);
+  var ok = fire(m.type === 'privmsg' ? 'text' : m.type, {
+    nick: from.nick, user: from.user, host: from.host, target: m.target, channel: chan, text: m.text,
+    isChannel: !!chan, isPrivate: !chan, highlight: hl, time: m.time
+  }, win);
+  if (!ok) return;
+  if (chan && m.type !== 'notice') win.spoke.set(lc(from.nick), Date.now());
+  var pfx = chan ? conn.userPrefix(chan, from.nick) : '';
+  var text;
+  if (m.type === 'privmsg') text = '<' + pfx + cnick(from.nick) + '> ' + m.text;
+  else if (m.type === 'action') text = PURPLE + '*' + RESET + ' ' + pfx + cnick(from.nick) + ' ' + m.text;
+  else text = PURPLE + '-' + from.nick + (chan ? ':' + chan : '') + '-' + RESET + ' ' + m.text;
+  print(win, text, { hl: hl, time: m.time });
+}
+
+function dur(s) {
+  s = Math.floor(+s);
+  var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  return [d && d + 'd', h && h + 'h', m && m + 'm', (s % 60) + 's'].filter(Boolean).join(' ');
+}
+function onNumeric(e) {
+  var code = e.code, p = e.params, rest = p.slice(1).join(' ');
+  var out = function (t, w) { print(w || cur, t, { act: false }); };
+  switch (code) {
+    case '001': out(GREY + '*** ' + p[1], status); break;
+    case '005': if (conn.network && status.name !== conn.network) { status.name = conn.network; chromeDirty(); } break;
+    case '002': case '003': case '004': case '315': case '318': case '321': case '323': case '329': case '332':
+    case '353': case '366': case '369': case '375': case '376': case '900': case '903':
+    case '251': case '252': case '253': case '254': case '255': case '265': case '266': case '372': case '377': case '378': break;
+    case '301': out(GREY + '*** ' + p[1] + ' is away: ' + p[2]); break;
+    case '311': out(GREY + '[whois]' + RESET + ' ' + cnick(p[1]) + ' is ' + p[2] + '@' + p[3] + ' (' + p[5] + ')'); break;
+    case '312': out(GREY + '[whois]' + RESET + ' ' + cnick(p[1]) + ' using ' + p[2] + ' (' + p[3] + ')'); break;
+    case '313': out(GREY + '[whois]' + RESET + ' ' + cnick(p[1]) + ' ' + p[2]); break;
+    case '317': out(GREY + '[whois]' + RESET + ' ' + cnick(p[1]) + ' idle ' + dur(p[2]) + (p[3] ? ', signed on ' + new Date(+p[3] * 1000).toLocaleString() : '')); break;
+    case '319': out(GREY + '[whois]' + RESET + ' ' + cnick(p[1]) + ' on ' + p[2]); break;
+    case '330': out(GREY + '[whois]' + RESET + ' ' + cnick(p[1]) + ' is logged in as ' + p[2]); break;
+    case '322': if (++listCount <= 300) out(GREY + '[list]' + RESET + ' ' + p[1] + ' (' + p[2] + ') ' + (p[3] || '')); else if (listCount === 301) out(GREY + '*** (list truncated at 300 channels)'); break;
+    case '324': out(GREY + '*** Modes for ' + p[1] + ': ' + p.slice(2).join(' ')); break;
+    case '333': out(GREY + '*** Topic set by ' + p[2] + ' on ' + new Date(+p[3] * 1000).toLocaleString(), findWin(p[1]) || cur); break;
+    case '352': out(GREY + '[who]' + RESET + ' ' + p[5] + ' (' + p[2] + '@' + p[3] + ') [' + p[1] + '] ' + (p[7] || '')); break;
+    default:
+      if (/^[45]/.test(code)) out(RED + '*** ' + rest); else out(GREY + rest, status);
+  }
+}
+
+/* ================================================================ commands */
+var CMD = {}, CMDALIAS = { j: 'join', leave: 'part', q: 'query', m: 'msg', k: 'kick', t: 'topic', w: 'whois', quote: 'raw', kb: 'kickban', win: 'window', exit: 'quit', server: 'connect' };
+function cmd(name, usage, fn) { CMD[name] = { usage: usage, fn: fn }; }
+function usage(win, n) { print(win, GREY + 'Usage: ' + CMD[n].usage, { act: false }); }
+function needConn(win) { if (!conn || !conn.connected) { print(win, RED + '*** Not connected. Click Connection to connect.', { act: false }); return false; } return true; }
+
+function runLine(line, win) {
+  win = win || cur;
+  if (line.indexOf('//') === 0) line = line.slice(1);
+  else if (line[0] === '/') return runCommand(line, win);
+  if (win.type === 'status') { info(win, 'You are not in a channel or query. Try /join #channel or /query nick'); return; }
+  if (!needConn(win)) return;
+  if (!fire('input', { text: line, target: win.name, channel: win.type === 'channel' ? win.name : null, isChannel: win.type === 'channel' }, win)) return;
+  sayTo(win.name, line);
+}
+function runCommand(line, win) {
+  var body = line.slice(1), bypass = false;
+  if (body[0] === '.') { bypass = true; body = body.slice(1); }
+  var m = /^(\S+)\s*([\s\S]*)$/.exec(body);
+  if (!m) return;
+  var name = m[1].toLowerCase(), args = m[2].trim();
+  if (depth > 5) { print(win, RED + '*** Commands nested too deeply', { act: false }); return; }
+  depth++;
+  try {
+    if (!bypass) {
+      var sa = engine.alias(name);
+      if (sa) {
+        sa(args, {
+          args: args, argv: args.split(/\s+/).filter(Boolean), window: win.name, target: win.type === 'status' ? null : win.name,
+          reply: function (t) { if (win.type !== 'status') sayTo(win.name, String(t)); else print(win, String(t), { act: false }); },
+          echo: function (t) { print(win, String(t), { act: false }); }
+        });
+        return;
+      }
+    }
+    var def = CMD[CMDALIAS[name] || name];
+    if (!def) { print(win, RED + '*** Unknown command: /' + name + ' (try /help)', { act: false }); return; }
+    try { def.fn(args, win); } catch (e) { print(win, RED + '*** /' + name + ' failed: ' + e.message, { act: false }); }
+  } finally { depth--; }
+}
+
+cmd('help', '/help [command]', function (a, win) {
+  if (a) { var n = CMDALIAS[a.replace(/^\//, '')] || a.replace(/^\//, ''); return print(win, CMD[n] ? GREY + CMD[n].usage : RED + '*** No such command: ' + a, { act: false }); }
+  info(win, 'Commands:');
+  Object.keys(CMD).forEach(function (k) { print(win, '  ' + CMD[k].usage, { act: false }); });
+  info(win, 'Keys: Tab completes, Up/Down recalls history, Alt+1..9 switches windows, PageUp/PageDown scrolls, Ctrl+B bold, Ctrl+K colour, Ctrl+U underline, Ctrl+I italic, Ctrl+O reset.');
+  info(win, 'Scripts: click Scripts to write JavaScript that reacts to chat. Aliases defined in scripts work as /commands. Prefix a command with a dot (/.msg) to skip script aliases.');
+  return undefined;
+});
+cmd('join', '/join <#channel>[,#channel...] [key]', function (a, win) {
+  if (!needConn(win)) return;
+  var t = take(a);
+  if (!t[0]) return usage(win, 'join');
+  var list = t[0].split(',').filter(Boolean).map(function (c) { return conn.isChannel(c) ? c : '#' + c; });
+  list.forEach(function (c) { userJoin.set(lc(c), Date.now()); });
+  conn.join(list.join(','), t[1] || undefined);
+  return undefined;
+});
+cmd('part', '/part [#channel] [reason]', function (a, win) {
+  if (!needConn(win)) return;
+  var t = take(a);
+  if (t[0] && conn.isChannel(t[0])) conn.part(t[0], t[1] || undefined);
+  else if (win.type === 'channel') conn.part(win.name, a || undefined);
+  else usage(win, 'part');
+});
+cmd('close', '/close   (closes this window; parts a channel)', function (a, win) {
+  if (win.type === 'status') return info(win, 'The server window cannot be closed.');
+  if (win.type === 'channel' && conn && conn.connected && win.chan) conn.part(win.name, a || undefined);
+  removeWin(win);
+  return undefined;
+});
+cmd('msg', '/msg <target> <text>', function (a, win) {
+  if (!needConn(win)) return;
+  var t = take(a);
+  if (!t[0] || !t[1]) return usage(win, 'msg');
+  sayTo(t[0], t[1]);
+  return undefined;
+});
+cmd('notice', '/notice <target> <text>', function (a, win) {
+  if (!needConn(win)) return;
+  var t = take(a);
+  if (!t[0] || !t[1]) return usage(win, 'notice');
+  conn.notice(t[0], t[1]);
+  print(win, GREY + '->' + RESET + ' -' + t[0] + '- ' + t[1], { act: false });
+  return undefined;
+});
+cmd('query', '/query <nick> [text]', function (a, win) {
+  var t = take(a);
+  if (!t[0]) return usage(win, 'query');
+  switchTo(openWin(t[0], 'query'));
+  if (t[1] && needConn(win)) sayTo(t[0], t[1]);
+  return undefined;
+});
+cmd('me', '/me <action text>', function (a, win) {
+  if (!needConn(win)) return;
+  if (win.type === 'status' || !a) return usage(win, 'me');
+  sayTo(win.name, a, true);
+  return undefined;
+});
+cmd('say', '/say <text>   (sends text even if it starts with /)', function (a, win) {
+  if (!needConn(win)) return;
+  if (win.type === 'status') return info(win, 'You are not in a channel or query.');
+  sayTo(win.name, a);
+  return undefined;
+});
+cmd('echo', '/echo <text>   (prints text only you can see)', function (a, win) { print(win, a, { act: false }); });
+cmd('ctcp', '/ctcp <target> <command> [args]', function (a, win) {
+  if (!needConn(win)) return;
+  var t = take(a), c = take(t[1]);
+  if (!t[0] || !c[0]) return usage(win, 'ctcp');
+  var u = c[0].toUpperCase();
+  conn.ctcp(t[0], u, u === 'PING' && !c[1] ? String(Date.now()) : c[1]);
+  info(win, 'CTCP ' + u + ' sent to ' + t[0]);
+  return undefined;
+});
+cmd('nick', '/nick <newnick>', function (a, win) {
+  var n = take(a)[0];
+  if (!n) return usage(win, 'nick');
+  if (conn && conn.connected) conn.send('NICK', n); else { settings.nick = n; saveSettings(); info(win, 'Nick set to ' + n + ' for the next connection'); }
+  return undefined;
+});
+cmd('away', '/away [message]   (no message means back)', function (a, win) { if (needConn(win)) conn.send('AWAY', a || undefined); });
+cmd('whois', '/whois <nick>', function (a, win) {
+  if (!needConn(win)) return;
+  var n = take(a)[0] || (win.type === 'query' ? win.name : '');
+  if (!n) return usage(win, 'whois');
+  conn.send('WHOIS', n);
+  return undefined;
+});
+cmd('who', '/who <mask|#channel>', function (a, win) { if (needConn(win)) conn.send('WHO', take(a)[0] || (win.type === 'channel' ? win.name : undefined)); });
+cmd('list', '/list [pattern]', function (a, win) { if (needConn(win)) { listCount = 0; conn.send('LIST', a || undefined); } });
+cmd('names', '/names [#channel]', function (a, win) {
+  var name = take(a)[0] || (win.type === 'channel' ? win.name : ''), ch = conn && name && conn.channels.get(lc(name));
+  if (!ch) return info(win, 'Not in that channel.');
+  var list = Array.from(ch.users.values()).map(function (u) { return conn.userPrefix(name, u.nick) + u.nick; });
+  info(win, name + ': ' + list.length + ' users');
+  print(win, list.join(' '), { act: false });
+  return undefined;
+});
+cmd('topic', '/topic [#channel] [new topic]', function (a, win) {
+  if (!needConn(win)) return;
+  var t = take(a), chan = win.type === 'channel' ? win.name : null, text = a;
+  if (t[0] && conn.isChannel(t[0])) { chan = t[0]; text = t[1]; }
+  if (!chan) return usage(win, 'topic');
+  conn.send('TOPIC', chan, text || undefined);
+  return undefined;
+});
+cmd('mode', '/mode [target] <+/-modes> [args]', function (a, win) {
+  if (!needConn(win)) return;
+  var t = take(a);
+  if (!t[0]) { conn.send('MODE', win.type === 'channel' ? win.name : conn.nick); return; }
+  if (/^[+-]/.test(t[0])) { if (win.type !== 'channel') return usage(win, 'mode'); conn.raw('MODE ' + win.name + ' ' + a); }
+  else conn.raw('MODE ' + t[0] + (t[1] ? ' ' + t[1] : ''));
+  return undefined;
+});
+function modeNicks(win, a, sign, letter, name) {
+  if (!needConn(win)) return;
+  if (win.type !== 'channel') return info(win, '/' + name + ' only works in a channel window.');
+  var nicks = a.split(/\s+/).filter(Boolean);
+  if (!nicks.length) return usage(win, name);
+  for (var i = 0; i < nicks.length; i += 4) { var g = nicks.slice(i, i + 4); conn.raw('MODE ' + win.name + ' ' + sign + letter.repeat(g.length) + ' ' + g.join(' ')); }
+  return undefined;
+}
+cmd('op', '/op <nick> [nick...]', function (a, w) { modeNicks(w, a, '+', 'o', 'op'); });
+cmd('deop', '/deop <nick> [nick...]', function (a, w) { modeNicks(w, a, '-', 'o', 'deop'); });
+cmd('voice', '/voice <nick> [nick...]', function (a, w) { modeNicks(w, a, '+', 'v', 'voice'); });
+cmd('devoice', '/devoice <nick> [nick...]', function (a, w) { modeNicks(w, a, '-', 'v', 'devoice'); });
+function parseKick(a, win) {
+  var t = take(a);
+  if (t[0] && conn.isChannel(t[0])) { var r = take(t[1]); return { chan: t[0], nick: r[0], reason: r[1] }; }
+  return { chan: win.type === 'channel' ? win.name : null, nick: t[0], reason: t[1] };
+}
+function banMask(who) { if (/[!@]/.test(who)) return who; var h = conn.userHost(who); return h ? '*!*@' + h.split('@')[1] : who + '!*@*'; }
+cmd('kick', '/kick [#channel] <nick> [reason]', function (a, win) {
+  if (!needConn(win)) return;
+  var k = parseKick(a, win);
+  if (!k.chan || !k.nick) return usage(win, 'kick');
+  conn.send('KICK', k.chan, k.nick, k.reason || undefined);
+  return undefined;
+});
+cmd('ban', '/ban <nick|mask>', function (a, win) {
+  if (!needConn(win)) return;
+  if (win.type !== 'channel' || !a) return usage(win, 'ban');
+  conn.raw('MODE ' + win.name + ' +b ' + banMask(take(a)[0]));
+  return undefined;
+});
+cmd('kickban', '/kickban [#channel] <nick> [reason]', function (a, win) {
+  if (!needConn(win)) return;
+  var k = parseKick(a, win);
+  if (!k.chan || !k.nick) return usage(win, 'kickban');
+  conn.raw('MODE ' + k.chan + ' +b ' + banMask(k.nick));
+  conn.send('KICK', k.chan, k.nick, k.reason || undefined);
+  return undefined;
+});
+cmd('invite', '/invite <nick> [#channel]', function (a, win) {
+  if (!needConn(win)) return;
+  var t = take(a), chan = t[1] || (win.type === 'channel' ? win.name : '');
+  if (!t[0] || !chan) return usage(win, 'invite');
+  conn.send('INVITE', t[0], chan);
+  return undefined;
+});
+cmd('raw', '/raw <irc line>   (also /quote)', function (a, win) { if (!needConn(win)) return; if (!a) return usage(win, 'raw'); conn.raw(a); return undefined; });
+cmd('ignore', '/ignore [nick|mask] | /ignore -r <mask>   (wildcards ok; no arguments lists)', function (a, win) {
+  var t = take(a);
+  if (!t[0]) return info(win, settings.ignore.length ? 'Ignoring: ' + settings.ignore.join(', ') : 'Ignore list is empty.');
+  if (t[0] === '-r') {
+    var m = /[!@*]/.test(t[1]) ? t[1] : t[1] + '!*@*';
+    settings.ignore = settings.ignore.filter(function (x) { return lc(x) !== lc(m); });
+    info(win, 'Removed ' + m + ' from the ignore list');
+  } else {
+    var m2 = /[!@*]/.test(t[0]) ? t[0] : t[0] + '!*@*';
+    if (settings.ignore.indexOf(m2) < 0) settings.ignore.push(m2);
+    info(win, 'Ignoring ' + m2);
+  }
+  rebuildIgnore(); saveSettings();
+  return undefined;
+});
+cmd('highlight', '/highlight [word] | /highlight -r <word>   (your nick always highlights)', function (a, win) {
+  var t = take(a);
+  if (!t[0]) return info(win, 'Highlight words: ' + (settings.highlights.join(', ') || '(none besides your nick)'));
+  if (t[0] === '-r') settings.highlights = settings.highlights.filter(function (x) { return lc(x) !== lc(t[1]); });
+  else if (settings.highlights.indexOf(a) < 0) settings.highlights.push(a);
+  info(win, 'Highlight words: ' + (settings.highlights.join(', ') || '(none)'));
+  saveSettings();
+  return undefined;
+});
+cmd('clear', '/clear', function (a, win) { win.lines = []; if (win === cur) logEl.textContent = ''; });
+cmd('window', '/window <number>', function (a, win) {
+  var n = parseInt(a, 10);
+  if (!(n >= 1 && n <= wins.length)) return info(win, 'Windows: ' + wins.map(function (w, i) { return (i + 1) + ':' + w.name; }).join('  '));
+  switchTo(wins[n - 1]);
+  return undefined;
+});
+cmd('scripts', '/scripts   (opens the script editor)', function () { openScripts(); });
+cmd('reload', '/reload   (re-runs your saved scripts)', function (a, win) { engine.unloadAll(); loadScripts(false); });
+cmd('connect', '/connect   (opens the connection panel)', function () { showConnect(); });
+cmd('disconnect', '/disconnect [message]', function (a, win) { if (conn && (conn.connected || conn.connecting)) { conn.disconnect(a || 'Zirc'); info(win, 'Disconnecting'); } else info(win, 'Not connected.'); });
+cmd('quit', '/quit [message]', function (a) { if (conn) conn.disconnect(a || 'Zirc'); });
+cmd('version', '/version', function (a, win) { info(win, 'Zirc ' + VERSION); });
+
+/* ================================================================ input */
+var inputEl = $('input');
+$('inputbar').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var line = inputEl.value;
+  inputEl.value = ''; hi = -1; tab = null;
+  if (!line.trim()) return;
+  if (hist[hist.length - 1] !== line) hist.push(line);
+  if (hist.length > 200) hist.shift();
+  runLine(line, cur);
+});
+function commandNames() {
+  var set = {};
+  Object.keys(CMD).concat(Object.keys(CMDALIAS), engine.names()).forEach(function (n) { set[n] = 1; });
+  return Object.keys(set).sort();
+}
+function doTab() {
+  var pos = inputEl.selectionStart;
+  if (!tab) {
+    var before = inputEl.value.slice(0, pos), word = /(\S*)$/.exec(before)[1], start = pos - word.length, wl = lc(word), list = [], kind = 'nick';
+    if (word[0] === '/' && start === 0) { kind = 'cmd'; list = commandNames().filter(function (c) { return c.indexOf(word.slice(1).toLowerCase()) === 0; }).map(function (c) { return '/' + c; }); }
+    else if (conn && word && conn.isChannel(word)) { kind = 'chan'; list = Array.from(conn.channels.values()).map(function (c) { return c.name; }).filter(function (n) { return lc(n).indexOf(wl) === 0; }); }
+    else if (cur.type === 'channel' && cur.chan) {
+      var me = lc(conn.nick);
+      list = Array.from(cur.chan.users.values()).map(function (u) { return u.nick; }).filter(function (n) { return lc(n) !== me && lc(n).indexOf(wl) === 0; });
+      list.sort(function (a, b) { return (cur.spoke.get(lc(b)) || 0) - (cur.spoke.get(lc(a)) || 0) || lc(a).localeCompare(lc(b)); });
+    } else if (cur.type === 'query') list = [cur.name].filter(function (n) { return lc(n).indexOf(wl) === 0; });
+    if (!list.length) return;
+    tab = { start: start, list: list, i: -1, len: word.length, kind: kind, atStart: start === 0 };
+  }
+  tab.i = (tab.i + 1) % tab.list.length;
+  var cand = tab.list[tab.i] + (tab.kind === 'nick' && tab.atStart ? ': ' : ' ');
+  inputEl.value = inputEl.value.slice(0, tab.start) + cand + inputEl.value.slice(tab.start + tab.len);
+  var np = tab.start + cand.length;
+  inputEl.setSelectionRange(np, np);
+  tab.len = cand.length;
+}
+function insertAtCaret(s) {
+  var a = inputEl.selectionStart, b = inputEl.selectionEnd;
+  inputEl.value = inputEl.value.slice(0, a) + s + inputEl.value.slice(b);
+  inputEl.setSelectionRange(a + s.length, a + s.length);
+}
+inputEl.addEventListener('keydown', function (e) {
+  var k = e.key;
+  if (k === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); doTab(); return; }
+  if (['Shift', 'Control', 'Alt', 'Meta'].indexOf(k) < 0) tab = null;
+  if (e.altKey && !e.ctrlKey && !e.metaKey) {
+    var m = /^Digit([1-9])$/.exec(e.code);
+    if (m) { e.preventDefault(); if (wins[+m[1] - 1]) switchTo(wins[+m[1] - 1]); return; }
+    if (k === 'ArrowUp' || k === 'ArrowDown') { e.preventDefault(); var i = wins.indexOf(cur) + (k === 'ArrowUp' ? -1 : 1); switchTo(wins[(i + wins.length) % wins.length]); return; }
+  }
+  if (e.ctrlKey && !e.altKey && !e.metaKey) {
+    var codes = { b: '\x02', k: '\x03', u: '\x1f', i: '\x1d', o: '\x0f', r: '\x16' };
+    if (codes[k.toLowerCase()]) { e.preventDefault(); insertAtCaret(codes[k.toLowerCase()]); return; }
+  }
+  if (k === 'ArrowUp' && !e.shiftKey) {
+    e.preventDefault();
+    if (!hist.length) return;
+    if (hi === -1) { draft = inputEl.value; hi = hist.length; }
+    if (hi > 0) { hi--; inputEl.value = hist[hi]; }
+  } else if (k === 'ArrowDown' && !e.shiftKey) {
+    e.preventDefault();
+    if (hi === -1) return;
+    hi++;
+    if (hi >= hist.length) { hi = -1; inputEl.value = draft; } else inputEl.value = hist[hi];
+  } else if (k === 'PageUp') { e.preventDefault(); logEl.scrollTop -= logEl.clientHeight * 0.85; }
+  else if (k === 'PageDown') { e.preventDefault(); logEl.scrollTop += logEl.clientHeight * 0.85; }
+});
+inputEl.addEventListener('paste', function (e) {
+  var t = (e.clipboardData || window.clipboardData).getData('text');
+  if (/[\r\n]/.test(t)) { e.preventDefault(); insertAtCaret(t.replace(/\s*[\r\n]+\s*/g, ' ')); }
+});
+
+/* ================================================================ connect screen */
+function showConnectError(msg) { $('cerr').textContent = msg ? 'Disconnected: ' + msg : ''; }
+function showConnect() {
+  var live = !!(conn && (conn.connected || conn.connecting));
+  $('ctitle').textContent = live ? 'Connection' : 'Connect';
+  $('gobtn').textContent = live ? 'Reconnect with these settings' : 'Connect';
+  $('discbtn').hidden = !live;
+  $('discbtn').textContent = 'Disconnect';
+  $('back').hidden = !(conn && conn.connected);
+  $('connect').hidden = false;
+  $('url').focus();
+}
+function hideConnect() {
+  $('connect').hidden = true;
+  $('app').hidden = false;
+  inputEl.focus();
+}
+$('preset').addEventListener('change', function () {
+  if (this.value) $('url').value = this.value;
+  else { $('url').value = ''; $('url').focus(); }
+  syncNote();
+});
+$('url').addEventListener('input', function () {
+  var match = Array.from($('preset').options).filter(function (o) { return o.value === $('url').value.trim(); })[0];
+  $('preset').value = match ? match.value : '';
+  syncNote();
+});
+function syncNote() {
+  $('urlnote').textContent = $('url').value.indexOf('testnet.ergo.chat') >= 0
+    ? "The Ergo test network logs all traffic for debugging. Don't use a real password there."
+    : 'Use wss:// on this page. Browsers block ws:// from secure pages, except for localhost.';
+}
+$('backbtn').addEventListener('click', function () { $('connect').hidden = true; inputEl.focus(); });
+$('discbtn').addEventListener('click', function () { if (conn) conn.disconnect('Zirc'); $('connect').hidden = true; });
+
+$('cform').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var url = $('url').value.trim(), nick = $('nick').value.trim(), err = $('cerr');
+  err.textContent = '';
+  if (!/^wss?:\/\/[^\s]+$/i.test(url)) { err.textContent = 'Enter a WebSocket address that starts with wss://'; $('url').focus(); return; }
+  if (location.protocol === 'https:' && /^ws:\/\//i.test(url) && !/^ws:\/\/(localhost|127\.0\.0\.1|\[::1\])/i.test(url)) { err.textContent = 'This page is secure, so the browser only allows wss:// addresses.'; $('url').focus(); return; }
+  if (!/^[A-Za-z_\[\]\\`^{|}][\w\-\[\]\\`^{|}]{0,31}$/.test(nick)) { err.textContent = 'Nicknames start with a letter and use letters, numbers, and - _ [ ] \\ ` ^ { | }.'; $('nick').focus(); return; }
+  settings.url = url; settings.nick = nick; settings.chans = $('chans').value.trim(); settings.sasluser = $('sasluser').value.trim();
+  saveSettings();
+  saslPass = $('saslpass').value;
+  $('saslpass').value = '';
+  startConnection();
+});
+
+function startConnection() {
+  if (conn) { conn.o.reconnect = false; try { conn.kill(); } catch (e) { /* ignore */ } conn.quitting = true; }
+  conn = new Conn({
+    url: settings.url, nick: settings.nick, user: settings.nick.replace(/[^\w]/g, '').slice(0, 16) || 'zirc',
+    sasl: settings.sasluser && saslPass ? { user: settings.sasluser, pass: saslPass } : null
+  });
+  wire(conn);
+  $('app').hidden = false;
+  if (!status) { status = new Win('zirc', 'status'); wins.unshift(status); cur = status; switchTo(status); }
+  else if (cur !== status && !findWin(cur.name)) switchTo(status);
+  status.name = 'zirc';
+  $('gobtn').textContent = 'Connecting...';
+  $('discbtn').hidden = false;
+  $('discbtn').textContent = 'Cancel';
+  conn.connect();
+  // If login hasn't completed shortly, keep the form up so the error is visible.
+  $('connect').hidden = false;
+  setTimeout(function () { $('gobtn').textContent = 'Connect'; }, 1500);
+}
+
+/* ================================================================ script editor */
+var sdlg = $('sdlg'), sSel = $('sd-sel'), sName = $('sd-name'), sCode = $('sd-code'), sMsg = $('sd-msg');
+var scriptList = [], scriptIdx = 0;
+function sdSay(t, bad) { sMsg.textContent = t; sMsg.className = 'msg' + (bad ? ' bad' : ''); }
+function sdFill() {
+  sSel.textContent = '';
+  scriptList.forEach(function (s, i) { var o = document.createElement('option'); o.value = String(i); o.textContent = s.name; sSel.appendChild(o); });
+  sSel.value = String(scriptIdx);
+  var s = scriptList[scriptIdx];
+  sName.value = s ? s.name : '';
+  sCode.value = s ? s.code : '';
+}
+function sdCommit() { var s = scriptList[scriptIdx]; if (s) { s.name = sName.value.trim().replace(/[^\w.-]/g, '_') || 'script'; s.code = sCode.value; } }
+function openScripts() {
+  scriptList = LS.get('zirc.scripts', []).map(function (s) { return { name: s.name, code: s.code }; });
+  if (!scriptList.length) scriptList.push({ name: 'my-script', code: '' });
+  scriptIdx = 0; sdFill(); sdSay('');
+  if (!sdlg.open) sdlg.showModal();
+  sCode.focus();
+}
+sSel.addEventListener('change', function () { sdCommit(); scriptIdx = +sSel.value; sdFill(); sdSay(''); });
+$('sd-new').addEventListener('click', function () { sdCommit(); scriptList.push({ name: 'script-' + (scriptList.length + 1), code: '' }); scriptIdx = scriptList.length - 1; sdFill(); sdSay(''); sName.focus(); });
+$('sd-del').addEventListener('click', function () {
+  if (!scriptList[scriptIdx]) return;
+  scriptList.splice(scriptIdx, 1);
+  if (!scriptList.length) scriptList.push({ name: 'my-script', code: '' });
+  scriptIdx = Math.max(0, scriptIdx - 1); sdFill(); sdSay('Deleted. Click Save and run to apply.');
+});
+$('sd-ex').addEventListener('click', function () { sCode.value = EXAMPLE; if (!sName.value.trim() || sName.value === 'my-script') sName.value = 'example'; sdSay('Example inserted. Click Save and run.'); });
+$('sd-close').addEventListener('click', function () { sdlg.close(); inputEl.focus(); });
+$('sd-save').addEventListener('click', function () {
+  sdCommit();
+  var seen = {};
+  scriptList.forEach(function (s) { var base = s.name, n = 2; while (seen[s.name]) s.name = base + '-' + n++; seen[s.name] = 1; });
+  LS.set('zirc.scripts', scriptList.filter(function (s) { return s.code.trim(); }));
+  engine.unloadAll();
+  var errs = loadScripts(true);
+  sdFill();
+  if (errs.length) sdSay(errs[0].name + ' failed: ' + errs[0].message, true);
+  else { sdSay('Saved and running.'); }
+});
+sCode.addEventListener('keydown', function (e) {
+  if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); var a = sCode.selectionStart; sCode.value = sCode.value.slice(0, a) + '  ' + sCode.value.slice(sCode.selectionEnd); sCode.setSelectionRange(a + 2, a + 2); }
+});
+sdlg.addEventListener('click', function (e) { if (e.target === sdlg) sdlg.close(); });
+
+/* ================================================================ chrome buttons & boot */
+$('btn-conn').addEventListener('click', showConnect);
+$('btn-scripts').addEventListener('click', openScripts);
+$('users-btn').addEventListener('click', function () { $('app').classList.toggle('nicks-open'); });
+$('log').addEventListener('click', function (e) { if (!(e.target.closest && e.target.closest('a')) && !window.getSelection().toString()) inputEl.focus(); });
+
+$('url').value = settings.url;
+$('nick').value = settings.nick;
+$('chans').value = settings.chans;
+$('sasluser').value = settings.sasluser;
+(function () {
+  var match = Array.from($('preset').options).filter(function (o) { return o.value === settings.url; })[0];
+  $('preset').value = match ? match.value : '';
+  syncNote();
+})();
+
+// Scripts start before any connection so timers and start-up code work from the first moment.
+status = new Win('zirc', 'status');
+wins.push(status);
+cur = status;
+conn = null;
+print(status, GREEN + 'Welcome to Zirc ' + VERSION + RESET + ' - an IRC client in your browser, scripted in JavaScript', { act: false });
+print(status, '  Click ' + RESET + '\x02Connection\x02 to pick a server, /help lists commands, and Scripts opens the editor.', { act: false });
+chromeDirty();
+setTimeout(function () { try { loadScripts(true); engine.emit('start', { event: 'start' }); } catch (e) { /* reported per script */ } }, 0);
+
 })();
 </script>
 </body>
